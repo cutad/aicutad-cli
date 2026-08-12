@@ -1,29 +1,53 @@
 // ─────────────────────────────────────────────────────────────
-// TUI native — full-screen interface tanpa React/Ink
-// Pakai terminal control codes manual (ANSI) + raw stdin.
-// Lebih reliable, tidak butuh bundling.
+// TUI native — full-screen interactive agent interface
+// Fitur: animated spinner, colored tool boxes, rounded borders,
+//        color-coded messages, real-time tool progress
 // ─────────────────────────────────────────────────────────────
 import { chatCompletion, listModels } from "../api.mjs";
 import { listAgents, getAgent, runAgent } from "../agent/index.mjs";
 import { listSessions, saveSession, appendMessage, createSession } from "../session/index.mjs";
 
+// ── Color palette ───────────────────────────────────────────
+const C = {
+  reset: "\x1b[0m",
+  bold: (s) => `\x1b[1m${s}\x1b[22m`,
+  dim: (s) => `\x1b[2m${s}\x1b[22m`,
+  cyan: (s) => `\x1b[36m${s}\x1b[39m`,
+  green: (s) => `\x1b[32m${s}\x1b[39m`,
+  yellow: (s) => `\x1b[33m${s}\x1b[39m`,
+  red: (s) => `\x1b[31m${s}\x1b[39m`,
+  magenta: (s) => `\x1b[35m${s}\x1b[39m`,
+  blue: (s) => `\x1b[34m${s}\x1b[39m`,
+  white: (s) => `\x1b[37m${s}\x1b[39m`,
+  bgCyan: (s) => `\x1b[46m\x1b[30m${s}\x1b[49m\x1b[39m`,
+  bgGreen: (s) => `\x1b[42m\x1b[30m${s}\x1b[49m\x1b[39m`,
+  bgYellow: (s) => `\x1b[43m\x1b[30m${s}\x1b[49m\x1b[39m`,
+  bgRed: (s) => `\x1b[41m\x1b[30m${s}\x1b[49m\x1b[39m`,
+  // true colors
+  teal: (s) => `\x1b[38;5;38m${s}\x1b[39m`,
+  orange: (s) => `\x1b[38;5;208m${s}\x1b[39m`,
+  gray: (s) => `\x1b[38;5;240m${s}\x1b[39m`,
+};
+
 const ANSI = {
   clear: "\x1b[2J",
-  clearLine: "\x1b[2K",
   home: "\x1b[H",
-  clearFromCursor: "\x1b[J",
   hideCursor: "\x1b[?25l",
   showCursor: "\x1b[?25h",
-  save: "\x1b[s",
-  restore: "\x1b[u",
   up: (n) => `\x1b[${n}A`,
-  down: (n) => `\x1b[${n}B`,
-  cyan: (s) => `\x1b[36m${s}\x1b[0m`,
-  bold: (s) => `\x1b[1m${s}\x1b[0m`,
-  dim: (s) => `\x1b[2m${s}\x1b[0m`,
-  green: (s) => `\x1b[32m${s}\x1b[0m`,
-  red: (s) => `\x1b[31m${s}\x1b[0m`,
-  yellow: (s) => `\x1b[33m${s}\x1b[0m`,
+};
+
+// Spinner frames
+const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+// Tool icons & colors
+const TOOL_STYLE = {
+  read_file:    { icon: "📖", color: C.blue,    label: "Read File" },
+  write_file:   { icon: "📝", color: C.green,   label: "Write File" },
+  edit_file:    { icon: "✏️", color: C.yellow,  label: "Edit File" },
+  list_files:   { icon: "📂", color: C.cyan,    label: "List Files" },
+  search_files: { icon: "🔍", color: C.magenta, label: "Search" },
+  run_command:  { icon: "⚡", color: C.orange,  label: "Run Command" },
 };
 
 const COMMANDS = [
@@ -31,7 +55,6 @@ const COMMANDS = [
   ["/models", "Daftar model"],
   ["/model <name>", "Ganti model"],
   ["/agents", "Daftar subagent"],
-  ["/agent <name> <task>", "Delegasi ke subagent"],
   ["/sessions", "Daftar session tersimpan"],
   ["/save", "Simpan session"],
   ["/clear", "Bersihkan layar"],
@@ -40,14 +63,12 @@ const COMMANDS = [
 
 /**
  * Start TUI full-screen.
- * @param {{baseUrl, apiKey, model, provider, session, systemPrompt}} config
  */
 export async function startTUI(config) {
   const stdin = process.stdin;
   const stdout = process.stdout;
 
   if (!stdin.isTTY || !stdout.isTTY) {
-    // fallback ke REPL non-TUI
     return fallbackREPL(config);
   }
 
@@ -57,12 +78,30 @@ export async function startTUI(config) {
   let model = config.model || "";
   let status = "ready";
   let showHelp = false;
+  let spinnerIdx = 0;
+  let spinnerTimer = null;
+  let toolCount = 0;
+  let iterCount = 0;
 
-  // Simpan pesan ke session
   function addMessage(msg) {
     messages.push(msg);
     if (config.session) {
       appendMessage(config.session, msg);
+    }
+  }
+
+  function startSpinner() {
+    if (spinnerTimer) return;
+    spinnerTimer = setInterval(() => {
+      spinnerIdx = (spinnerIdx + 1) % SPINNER.length;
+      render();
+    }, 80);
+  }
+
+  function stopSpinner() {
+    if (spinnerTimer) {
+      clearInterval(spinnerTimer);
+      spinnerTimer = null;
     }
   }
 
@@ -71,48 +110,94 @@ export async function startTUI(config) {
     const H = stdout.rows || 24;
     const lines = [];
 
-    // Header
-    lines.push(` ${ANSI.bold(ANSI.cyan("AI CUTAD"))}${ANSI.dim(" — AI Coding Agent CLI")}`);
+    // ── Header bar ──
+    lines.push(` ${C.bold(C.cyan("◆ AI CUTAD"))} ${C.gray("│")} ${C.dim("AI Coding Agent CLI")} ${C.gray("v0.3.0")}`);
+    lines.push(` ${C.gray("─".repeat(W - 2))}`);
 
-    // Chat area
+    // ── Help panel ──
     if (showHelp) {
-      lines.push(ANSI.cyan(" Perintah:"));
+      lines.push(` ${C.bold(C.cyan("Perintah tersedia"))}`);
       for (const [name, desc] of COMMANDS) {
-        lines.push(`  ${ANSI.cyan(name.padEnd(24))}${ANSI.dim(desc)}`);
+        lines.push(`   ${C.cyan(name.padEnd(22))} ${C.gray(desc)}`);
       }
       lines.push("");
     }
 
+    // ── Empty state ──
     if (messages.length === 0 && !loading) {
-      lines.push(ANSI.dim(" Ketik pesan atau /help untuk bantuan."));
+      lines.push("");
+      lines.push(`   ${C.gray("┌─────────────────────────────────────────────┐")}`);
+      lines.push(`   ${C.gray("│")}  ${C.dim("Ketik tugas atau pertanyaan, lalu Enter")}  ${C.gray("│")}`);
+      lines.push(`   ${C.gray("│")}  ${C.cyan("Contoh:")} ${C.dim("\"buat file hello.js\"")}        ${C.gray("│")}`);
+      lines.push(`   ${C.gray("│")}  ${C.cyan("Ketik")} ${C.bold("/help")} ${C.dim("untuk bantuan")}           ${C.gray("│")}`);
+      lines.push(`   ${C.gray("└─────────────────────────────────────────────┘")}`);
+      lines.push("");
     }
 
-    const visible = messages.slice(-Math.max(5, H - 8));
+    // ── Messages ──
+    const maxMsgLines = H - 7;
+    const visible = messages.slice(-Math.max(5, Math.floor(maxMsgLines / 2)));
     for (const msg of visible) {
       if (msg.role === "user") {
-        lines.push(` ${ANSI.bold(ANSI.cyan("you"))}${ANSI.dim(" › ")}${msg.content}`);
-      } else if (msg.role === "system") {
-        lines.push(ANSI.dim(` [${msg.content}]`));
-      } else {
-        lines.push(` ${ANSI.bold(ANSI.cyan("AI CUTAD"))}`);
-        // wrap content
-        const wrapped = wrapText(msg.content, W - 2);
-        for (const line of wrapped) lines.push(` ${line}`);
+        lines.push(` ${C.bold(C.cyan("┌─ you"))}`);
+        const wrapped = wrapText(msg.content, W - 5);
+        for (const line of wrapped) {
+          lines.push(` ${C.cyan("│")} ${line}`);
+        }
+        lines.push(` ${C.cyan("└─")}`);
+      } else if (msg.role === "tool_call") {
+        // Tool call box (yellow border)
+        const style = TOOL_STYLE[msg.toolName] || { icon: "🔧", color: C.yellow, label: msg.toolName };
+        const argStr = msg.argsPreview || "";
+        lines.push(` ${C.yellow("┌─")} ${style.icon} ${C.bold(C.yellow(style.label))} ${C.gray(argStr)}`);
+        lines.push(` ${C.yellow("└─")} ${C.gray("menunggu eksekusi...")}`);
+      } else if (msg.role === "tool_result") {
+        // Tool result (green border)
+        const style = TOOL_STYLE[msg.toolName] || { icon: "🔧", color: C.green, label: msg.toolName };
+        const preview = msg.preview || "";
+        lines.push(` ${C.green("┌─")} ${style.icon} ${C.bold(C.green(style.label))} ${C.gray("selesai")}`);
+        const wrapped = wrapText(preview, W - 5);
+        for (const line of wrapped.slice(0, 3)) {
+          lines.push(` ${C.green("│")} ${C.dim(line)}`);
+        }
+        if (wrapped.length > 3) {
+          lines.push(` ${C.green("│")} ${C.gray(`… +${wrapped.length - 3} baris lainnya`)}`);
+        }
+        lines.push(` ${C.green("└─")}`);
+      } else if (msg.role === "assistant") {
+        lines.push(` ${C.bold(C.green("┌─ AI CUTAD"))}`);
+        const wrapped = wrapText(msg.content, W - 5);
+        for (const line of wrapped) {
+          lines.push(` ${C.green("│")} ${line}`);
+        }
+        lines.push(` ${C.green("└─")}`);
       }
     }
 
+    // ── Loading / spinner ──
     if (loading) {
-      lines.push(` ${ANSI.cyan("⠋")} ${ANSI.dim("menunggu respons…")}`);
+      const frame = SPINNER[spinnerIdx];
+      let statusText = "menunggu respons";
+      if (status === "agent") {
+        if (toolCount > 0) {
+          statusText = `bekerja · ${toolCount} tool · ${iterCount} iterasi`;
+        } else {
+          statusText = "berpikir";
+        }
+      }
+      lines.push(` ${C.cyan(frame)} ${C.dim(statusText + "…")}`);
     }
 
-    // Status bar
-    lines.push(ANSI.dim("─".repeat(W)));
-    lines.push(ANSI.dim(` ${ANSI.cyan("AI CUTAD")} │ ${ANSI.bold(model)} │ ${config.provider || "cutad"} │ ${messages.length} pesan │ ${status}`));
+    // ── Status bar ──
+    lines.push(` ${C.gray("─".repeat(W - 2))}`);
+    const statusIcon = loading ? C.yellow("●") : status === "error" ? C.red("●") : C.green("●");
+    const statusLabel = loading ? C.yellow("bekerja") : status === "error" ? C.red("error") : C.green("ready");
+    lines.push(` ${statusIcon} ${C.gray("│")} ${statusLabel} ${C.gray("│")} ${C.bold(model)} ${C.gray("│")} ${C.dim(`${messages.length} pesan`)} ${C.gray("│")} ${C.dim(config.provider || "cutad")}`);
 
-    // Input line
-    lines.push(` ${ANSI.bold(ANSI.cyan("you ›"))} ${input}${ANSI.dim("█")}`);
+    // ── Input ──
+    lines.push(` ${C.bold(C.cyan("you ›"))} ${input}${C.gray("▎")}`);
 
-    // Render: clear screen & write
+    // Render
     stdout.write(ANSI.clear + ANSI.home);
     stdout.write(lines.join("\n") + "\n");
   }
@@ -131,11 +216,30 @@ export async function startTUI(config) {
     return out;
   }
 
+  function formatToolArgs(name, args) {
+    if (name === "read_file") return args.path || "";
+    if (name === "write_file") return `${args.path || ""}, ${args.content?.length || 0}b`;
+    if (name === "edit_file") return args.path || "";
+    if (name === "list_files") return args.path || ".";
+    if (name === "search_files") return `"${args.pattern || ""}"`;
+    if (name === "run_command") return (args.command || "").slice(0, 50);
+    return Object.keys(args).join(", ");
+  }
+
+  function buildAgentTask(userMsg, history) {
+    const recent = history
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-6)
+      .map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.content}`)
+      .join("\n");
+    if (recent) return `${userMsg}\n\n--- Konteks percakapan sebelumnya ---\n${recent}`;
+    return userMsg;
+  }
+
   async function handleSubmit(text) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // Command? (/help, /model, dll — bukan agent)
     if (trimmed.startsWith("/")) {
       input = "";
       await handleCommand(trimmed);
@@ -143,11 +247,13 @@ export async function startTUI(config) {
       return;
     }
 
-    // Setiap pesan = agent (selalu punya tools)
     input = "";
     addMessage({ role: "user", content: trimmed });
     loading = true;
     status = "agent";
+    toolCount = 0;
+    iterCount = 0;
+    startSpinner();
     render();
 
     const { runAgentLoop } = await import("../agent/loop.mjs");
@@ -159,17 +265,15 @@ export async function startTUI(config) {
         task: buildAgentTask(trimmed, messages),
         cwd: process.cwd(),
         onToolCall: (name, args) => {
-          const argPreview = formatToolArgs(name, args);
-          addMessage({ role: "system", content: `⚡ ${name}(${argPreview})` });
+          toolCount++;
+          iterCount++;
+          addMessage({ role: "tool_call", toolName: name, argsPreview: formatToolArgs(name, args) });
           render();
         },
         onToolResult: (name, result) => {
-          const preview = result.split("\n").slice(0, 2).join(" ").slice(0, 120);
-          addMessage({ role: "system", content: `✓ ${name} → ${preview}` });
+          const preview = result.split("\n").slice(0, 3).join("\n").slice(0, 200);
+          addMessage({ role: "tool_result", toolName: name, preview });
           render();
-        },
-        onThinking: (content) => {
-          // thinking opsional, tidak ditampilkan untuk mengurangi noise
         },
       });
       addMessage({ role: "assistant", content: result.result || "(selesai)" });
@@ -179,33 +283,9 @@ export async function startTUI(config) {
       status = "error";
     } finally {
       loading = false;
+      stopSpinner();
       render();
     }
-  }
-
-  /** Format argumen tool untuk display. */
-  function formatToolArgs(name, args) {
-    if (name === "read_file") return args.path || "";
-    if (name === "write_file") return `${args.path || ""}, ${args.content?.length || 0}b`;
-    if (name === "edit_file") return args.path || "";
-    if (name === "list_files") return args.path || ".";
-    if (name === "search_files") return `"${args.pattern || ""}"`;
-    if (name === "run_command") return (args.command || "").slice(0, 60);
-    return Object.keys(args).join(", ");
-  }
-
-  /** Bangun task untuk agent dari pesan user + history chat. */
-  function buildAgentTask(userMsg, history) {
-    const recent = history
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .slice(-6) // 6 pesan terakhir untuk konteks
-      .map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.content}`)
-      .join("\n");
-
-    if (recent) {
-      return `${userMsg}\n\n--- Konteks percakapan sebelumnya ---\n${recent}`;
-    }
-    return userMsg;
   }
 
   async function handleCommand(cmd) {
@@ -224,7 +304,7 @@ export async function startTUI(config) {
       case "/model":
         if (parts[1]) {
           model = parts[1];
-          addMessage({ role: "system", content: `Model diganti ke ${parts[1]}` });
+          addMessage({ role: "assistant", content: `Model diganti ke ${parts[1]}` });
         }
         break;
       case "/agents": {
@@ -235,6 +315,7 @@ export async function startTUI(config) {
       }
       case "/models": {
         loading = true;
+        startSpinner();
         render();
         try {
           const models = await listModels(config.baseUrl, config.apiKey);
@@ -244,6 +325,7 @@ export async function startTUI(config) {
           addMessage({ role: "assistant", content: `Error: ${e.message}` });
         } finally {
           loading = false;
+          stopSpinner();
         }
         break;
       }
@@ -260,9 +342,9 @@ export async function startTUI(config) {
       case "/save": {
         if (config.session) {
           saveSession(config.session);
-          addMessage({ role: "system", content: `Session disimpan: ${config.session.id}` });
+          addMessage({ role: "assistant", content: `Session disimpan: ${config.session.id}` });
         } else {
-          addMessage({ role: "system", content: "Tidak ada session aktif." });
+          addMessage({ role: "assistant", content: "Tidak ada session aktif." });
         }
         break;
       }
@@ -271,94 +353,32 @@ export async function startTUI(config) {
         showHelp = false;
         break;
       default:
-        if (command === "/agent" && parts.length >= 2) {
-          // Cek apakah parts[1] adalah nama subagent atau bagian dari task
-          const possibleAgent = parts[1];
-          const agent = getAgent(possibleAgent);
-
-          if (agent && parts.length >= 3) {
-            // /agent cutad-search "riset X" → subagent delegate
-            const task = parts.slice(2).join(" ");
-            loading = true;
-            addMessage({ role: "user", content: `[delegate → ${possibleAgent}] ${task}` });
-            render();
-            try {
-              const result = await runAgent(agent, task, {
-                baseUrl: config.baseUrl,
-                apiKey: config.apiKey,
-                model: model || config.model,
-              });
-              addMessage({ role: "assistant", content: result });
-            } catch (e) {
-              addMessage({ role: "assistant", content: `Agent error: ${e.message}` });
-            } finally {
-              loading = false;
-            }
-          } else {
-            // /agent <task> → agentic loop (baca/tulis file, run command)
-            const task = parts.slice(1).join(" ");
-            loading = true;
-            status = "agent";
-            addMessage({ role: "user", content: `[agent] ${task}` });
-            render();
-
-            const { runAgentLoop } = await import("../agent/loop.mjs");
-            try {
-              const result = await runAgentLoop({
-                baseUrl: config.baseUrl,
-                apiKey: config.apiKey,
-                model: model || config.model,
-                task,
-                cwd: process.cwd(),
-                onToolCall: (name, args) => {
-                  addMessage({ role: "system", content: `⚡ ${name}(${Object.keys(args).join(", ")})` });
-                  render();
-                },
-                onToolResult: (name, result) => {
-                  const preview = result.split("\n").slice(0, 2).join(" ");
-                  addMessage({ role: "system", content: `✓ ${name}: ${preview.slice(0, 100)}` });
-                  render();
-                },
-              });
-              addMessage({ role: "assistant", content: result.result || "(selesai)" });
-            } catch (e) {
-              addMessage({ role: "assistant", content: `Agent error: ${e.message}` });
-            } finally {
-              loading = false;
-              status = "ready";
-            }
-          }
-        } else {
-          addMessage({ role: "system", content: `Perintah tidak dikenal: ${command}. Ketik /help` });
-        }
+        addMessage({ role: "assistant", content: `Perintah tidak dikenal: ${command}. Ketik /help` });
     }
   }
 
   function cleanup() {
+    stopSpinner();
     stdout.write(ANSI.showCursor);
     stdout.write(ANSI.clear + ANSI.home);
     if (stdin.isTTY) stdin.setRawMode(false);
     stdin.pause();
   }
 
-  // Setup raw mode
+  // Setup
   stdin.setRawMode(true);
   stdin.resume();
   stdout.write(ANSI.hideCursor);
   render();
 
-  // Input handler
   const onData = (chunk) => {
     const str = chunk.toString();
-    // Proses per-karakter (chunk bisa berisi multi-char dari paste/expect)
     for (const ch of str) {
-      // Ctrl+C
       if (ch === "\u0003") {
         cleanup();
         process.exit(130);
         return;
       }
-      // Enter
       if (ch === "\r" || ch === "\n") {
         const text = input;
         input = "";
@@ -366,23 +386,18 @@ export async function startTUI(config) {
         handleSubmit(text).catch((e) => {
           addMessage({ role: "assistant", content: `Error: ${e.message}` });
           loading = false;
+          stopSpinner();
           status = "error";
           render();
         });
         return;
       }
-      // Backspace
       if (ch === "\u007f" || ch === "\b") {
         input = input.slice(0, -1);
         render();
         continue;
       }
-      // Arrow keys: skip ESC sequences (ESC + [ + A/B/C/D)
-      if (ch === "\x1b") {
-        // mark that we're in escape sequence, skip next 2 chars
-        continue;
-      }
-      // Regular printable char
+      if (ch === "\x1b") continue;
       if (ch >= " ") {
         input += ch;
         render();
@@ -391,11 +406,8 @@ export async function startTUI(config) {
   };
 
   stdin.on("data", onData);
-
-  // Handle resize
   stdout.on("resize", render);
 
-  // Keep process alive
   return new Promise((resolve) => {
     process.on("exit", () => {
       cleanup();
