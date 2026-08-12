@@ -31,9 +31,12 @@ const C = {
 
 const ANSI = {
   clear: "\x1b[2J",
+  clearBelow: "\x1b[J",
   home: "\x1b[H",
   hideCursor: "\x1b[?25l",
   showCursor: "\x1b[?25h",
+  altScreenEnter: "\x1b[?1049h",
+  altScreenExit: "\x1b[?1049l",
   up: (n) => `\x1b[${n}A`,
 };
 
@@ -197,8 +200,8 @@ export async function startTUI(config) {
     // ── Input ──
     lines.push(` ${C.bold(C.cyan("you ›"))} ${input}${C.gray("▎")}`);
 
-    // Render
-    stdout.write(ANSI.clear + ANSI.home);
+    // Render — smooth (home + clear below, bukan clear-entire = no flicker)
+    stdout.write(ANSI.home + ANSI.clearBelow);
     stdout.write(lines.join("\n") + "\n");
   }
 
@@ -360,12 +363,13 @@ export async function startTUI(config) {
   function cleanup() {
     stopSpinner();
     stdout.write(ANSI.showCursor);
-    stdout.write(ANSI.clear + ANSI.home);
+    stdout.write(ANSI.altScreenExit);
     if (stdin.isTTY) stdin.setRawMode(false);
     stdin.pause();
   }
 
-  // Setup
+  // Setup — alternate buffer + raw mode
+  stdout.write(ANSI.altScreenEnter);
   stdin.setRawMode(true);
   stdin.resume();
   stdout.write(ANSI.hideCursor);
