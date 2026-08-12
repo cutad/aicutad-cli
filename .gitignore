@@ -1,0 +1,5 @@
+node_modules/
+.env
+*.tgz
+.cutad/
+.DS_Store
