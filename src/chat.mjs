@@ -2,16 +2,16 @@
 import { createInterface } from "node:readline";
 import { readAuth, resolveBase } from "./config.mjs";
 import { chatCompletion } from "./api.mjs";
-import { brand, rule, ok, fail, info, arrow, spinner, cmd, pc } from "./ui.mjs";
+import { banner, subtitle, rule, ok, fail, info, arrow, spinner, cmd, pc } from "./ui.mjs";
 
-const DEFAULT_SYSTEM = [
-  "Kamu adalah AI❖CUTAD, asisten AI coding premium.",
+const SYSTEM_PROMPT = [
+  "Kamu adalah AI CUTAD, asisten AI coding.",
   "Bantu menulis, memeriksa, merancang, dan menjelaskan kode.",
-  "Jawab dengan ringkas, praktis, disertai contoh kode bila relevan.",
+  "Jawab ringkas, praktis, sertakan contoh kode bila relevan.",
 ].join(" ");
 
 /**
- * Jalankan chat sekali jalan lalu cetak jawabannya.
+ * Jalankan chat sekali lalu cetak jawabannya.
  * @param {string} prompt teks prompt (kosong => interaktif)
  * @param {string[]} argv argumen CLI
  */
@@ -31,15 +31,15 @@ export async function chat(prompt, argv = []) {
   }
 
   const messages = [
-    { role: "system", content: DEFAULT_SYSTEM },
+    { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: promptText },
   ];
 
-  const stop = spinner(`AI❖CUTAD bekerja (${model})`);
+  const stop = spinner(`Menunggu respons (${model}) ...`);
   try {
     const content = await chatCompletion({ baseUrl: BASE_URL, apiKey: auth.apiKey, model, messages });
     await stop();
-    printAssistant(content);
+    printAnswer(content, model);
   } catch (e) {
     await stop();
     console.error(`\n  ${fail(e.message)}`);
@@ -56,43 +56,40 @@ function reqModel(argv) {
   return undefined;
 }
 
-/** Cetak jawaban model dengan header khas. */
-function printAssistant(content) {
-  console.log(`\n${pc.dim("─".repeat(6))} ${pc.bold(pc.magenta("AI❖CUTAD"))} ${pc.dim("─".repeat(6))}\n`);
-  console.log(content);
-  console.log(`\n${pc.dim("─".repeat(32))}\n`);
+/** Cetak jawaban dengan pemisah rapi. */
+function printAnswer(content, model) {
+  console.log(`\n${pc.dim(rule("─", 56))}\n${content}\n${pc.dim(rule("─", 56))}  ${pc.dim(`[${model}]`)}\n`);
 }
 
 /** REPL interaktif berkelanjutan. */
 async function interactive(auth, baseUrl, model) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const messages = [{ role: "system", content: DEFAULT_SYSTEM }];
+  const messages = [{ role: "system", content: SYSTEM_PROMPT }];
 
-  console.log(`\n${brand()}`);
-  console.log(`${rule()}`);
-  console.log(`  ${info(`Mode interaktif`)}  ${pc.dim(`model: ${pc.white(model)}`)}`);
-  console.log(`  ${arrow(`Ketik pesan, atau \`${cmd("exit")}\` untuk keluar.`)}\n`);
+  console.log(`\n${banner()}\n  ${subtitle()}\n${rule()}`);
+  console.log(`  ${info(`Mode interaktif`)}  ${pc.dim(`| model: ${pc.cyan(model)}`)}`);
+  console.log(`  ${arrow(`Ketik pesan. ${cmd("exit")} untuk keluar.`)}\n`);
 
   const loop = () => {
-    rl.question(pc.bold(pc.cyan("  you▸ ")), async (input) => {
+    rl.question(`${pc.cyan("you")}${pc.dim(" > ")}`, async (input) => {
       const msg = input.trim();
       if (!msg) return loop();
-      if (["exit", "quit"].includes(msg.toLowerCase())) {
-        console.log(`\n  ${ok("Sampai jumpa!")}  ${pc.dim("AI❖CUTAD")}\n`);
+      if (["exit", "quit", "/bye"].includes(msg.toLowerCase())) {
+        console.log(`\n  ${ok("Sampai jumpa.")}\n`);
         rl.close();
         return;
       }
 
       messages.push({ role: "user", content: msg });
-      const stop = spinner(`AI❖CUTAD bekerja (${model})`);
+      const stop = spinner("Menunggu respons ...");
       try {
         const content = await chatCompletion({ baseUrl, apiKey: auth.apiKey, model, messages });
         await stop();
         messages.push({ role: "assistant", content });
-        printAssistant(content);
+        console.log(`\n${content}\n`);
       } catch (e) {
         await stop();
-        console.error(`\n  ${fail(e.message)}`);
+        console.error(`  ${fail(e.message)}`);
       }
       loop();
     });

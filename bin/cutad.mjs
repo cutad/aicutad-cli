@@ -11,7 +11,7 @@ const program = new Command();
 
 program
   .name("aicutad")
-  .description("AI❖CUTAD — AI coding agent CLI (gateway ai.cutad.web.id)")
+  .description("AI CUTAD — AI coding agent CLI (gateway ai.cutad.web.id)")
   .version(pkg.version, "-v, --version", "tampilkan versi");
 
 program

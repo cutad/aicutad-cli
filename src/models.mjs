@@ -1,7 +1,7 @@
 // Tampilkan daftar model dari gateway
 import { readAuth, resolveBase } from "./config.mjs";
 import { listModels } from "./api.mjs";
-import { brand, rule, panel, row, ok, fail, spinner, pc } from "./ui.mjs";
+import { banner, subtitle, rule, panel, row, ok, fail, spinner, cmd, pc } from "./ui.mjs";
 
 export async function models(argv = []) {
   const auth = readAuth();
@@ -12,10 +12,9 @@ export async function models(argv = []) {
 
   const { BASE_URL } = resolveBase(argv);
 
-  console.log(`\n${brand()}`);
-  console.log(`${rule()}\n`);
+  console.log(`\n${banner()}\n  ${subtitle()}\n${rule()}\n`);
 
-  const stop = spinner("Memuat daftar model dari gateway");
+  const stop = spinner("Memuat daftar model ...");
   let list = [];
   try {
     list = await listModels(auth.baseUrl || BASE_URL, auth.apiKey);
@@ -26,23 +25,22 @@ export async function models(argv = []) {
     process.exit(1);
   }
 
-  const header = `Model di ${pc.cyan(auth.baseUrl || BASE_URL)} ${pc.dim(`(${list.length})`)}`;
+  const header = `Model di ${pc.cyan(auth.baseUrl || BASE_URL)}  (${list.length})`;
   if (list.length === 0) {
-    console.log(panel(header, [`  ${pc.dim("(tidak ada model yang dibagikan gateway)")}`]));
+    console.log(panel(header, [`  ${pc.dim("(kosong)")}`]));
     console.log("");
     return;
   }
 
-  // Susun 2 kolom biar rapi
   const rows = list.map((m) => m.id);
   const lines = [];
   for (let i = 0; i < rows.length; i += 2) {
-    const left = `  ${pc.bold(pc.white(rows[i]))}`;
-    const right = rows[i + 1] ? `  ${pc.bold(pc.white(rows[i + 1]))}` : "";
-    lines.push(`${left.padEnd(34)}${right}`);
+    const left = `  ${rows[i]}`;
+    const right = rows[i + 1] ? `  ${rows[i + 1]}` : "";
+    lines.push(`${left.padEnd(32)}${right}`);
   }
 
-  console.log(panel(header, lines));
-  console.log(`  ${ok(`${list.length} model tersedia.`)}  ${pc.dim("Untuk memilih:")}  ${pc.bgCyan(pc.black(" chat -m <model> "))}`);
+  console.log(panel(header, lines, { width: 78 }));
+  console.log(`  ${ok(`${list.length} model tersedia.`)}  ${pc.dim("Pilih lewat:")} ${cmd("chat -m <model>")}`);
   console.log("");
 }

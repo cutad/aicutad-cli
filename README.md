@@ -1,4 +1,4 @@
-# AI❖CUTAD CLI — `aicutad-cli`
+# AI CUTAD CLI — `aicutad-cli`
 
 > AI coding agent CLI premium yang terhubung ke gateway AI **cutad.web.id**
 > (OpenAI‑compatible `/v1`).
@@ -43,7 +43,7 @@ Tanpa prompt, `aicutad chat` masuk **mode interaktif**:
 ```bash
 aicutad chat
   you▸ tulis fungsi fibonacci di python
-  AI❖CUTAD def fib(n): ...
+  AI CUTAD def fib(n): ...
 ```
 
 ## Perintah
