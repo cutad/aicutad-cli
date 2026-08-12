@@ -135,7 +135,7 @@ export async function startTUI(config) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // Command?
+    // Command? (/help, /model, dll — bukan agent)
     if (trimmed.startsWith("/")) {
       input = "";
       await handleCommand(trimmed);
@@ -143,28 +143,36 @@ export async function startTUI(config) {
       return;
     }
 
-    // Normal chat
+    // Setiap pesan = agent (selalu punya tools)
     input = "";
     addMessage({ role: "user", content: trimmed });
     loading = true;
-    status = "thinking";
+    status = "agent";
     render();
 
+    const { runAgentLoop } = await import("../agent/loop.mjs");
     try {
-      const history = messages
-        .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role, content: m.content }));
-      const content = await chatCompletion({
+      const result = await runAgentLoop({
         baseUrl: config.baseUrl,
         apiKey: config.apiKey,
         model: model || config.model,
-        messages: [
-          { role: "system", content: config.systemPrompt || "Kamu adalah AI CUTAD, asisten AI coding." },
-          ...history,
-          { role: "user", content: trimmed },
-        ],
+        task: buildAgentTask(trimmed, messages),
+        cwd: process.cwd(),
+        onToolCall: (name, args) => {
+          const argPreview = formatToolArgs(name, args);
+          addMessage({ role: "system", content: `⚡ ${name}(${argPreview})` });
+          render();
+        },
+        onToolResult: (name, result) => {
+          const preview = result.split("\n").slice(0, 2).join(" ").slice(0, 120);
+          addMessage({ role: "system", content: `✓ ${name} → ${preview}` });
+          render();
+        },
+        onThinking: (content) => {
+          // thinking opsional, tidak ditampilkan untuk mengurangi noise
+        },
       });
-      addMessage({ role: "assistant", content });
+      addMessage({ role: "assistant", content: result.result || "(selesai)" });
       status = "ready";
     } catch (e) {
       addMessage({ role: "assistant", content: `Error: ${e.message}` });
@@ -173,6 +181,31 @@ export async function startTUI(config) {
       loading = false;
       render();
     }
+  }
+
+  /** Format argumen tool untuk display. */
+  function formatToolArgs(name, args) {
+    if (name === "read_file") return args.path || "";
+    if (name === "write_file") return `${args.path || ""}, ${args.content?.length || 0}b`;
+    if (name === "edit_file") return args.path || "";
+    if (name === "list_files") return args.path || ".";
+    if (name === "search_files") return `"${args.pattern || ""}"`;
+    if (name === "run_command") return (args.command || "").slice(0, 60);
+    return Object.keys(args).join(", ");
+  }
+
+  /** Bangun task untuk agent dari pesan user + history chat. */
+  function buildAgentTask(userMsg, history) {
+    const recent = history
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-6) // 6 pesan terakhir untuk konteks
+      .map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.content}`)
+      .join("\n");
+
+    if (recent) {
+      return `${userMsg}\n\n--- Konteks percakapan sebelumnya ---\n${recent}`;
+    }
+    return userMsg;
   }
 
   async function handleCommand(cmd) {
@@ -317,36 +350,43 @@ export async function startTUI(config) {
   // Input handler
   const onData = (chunk) => {
     const str = chunk.toString();
-    // Ctrl+C
-    if (str === "\u0003") {
-      cleanup();
-      process.exit(130);
-      return;
-    }
-    // Enter
-    if (str === "\r" || str === "\n") {
-      handleSubmit(input);
-      return;
-    }
-    // Backspace
-    if (str === "\u007f" || str === "\b") {
-      input = input.slice(0, -1);
-      render();
-      return;
-    }
-    // Arrow keys (ignore)
-    if (str === "\x1b[A" || str === "\x1b[B" || str === "\x1b[C" || str === "\x1b[D") return;
-    // Regular char
-    if (str.length === 1 && str >= " ") {
-      input += str;
-      render();
-      return;
-    }
-    // Multi-char (paste)
-    if (str.length > 1 && !str.startsWith("\x1b")) {
-      input += str;
-      render();
-      return;
+    // Proses per-karakter (chunk bisa berisi multi-char dari paste/expect)
+    for (const ch of str) {
+      // Ctrl+C
+      if (ch === "\u0003") {
+        cleanup();
+        process.exit(130);
+        return;
+      }
+      // Enter
+      if (ch === "\r" || ch === "\n") {
+        const text = input;
+        input = "";
+        render();
+        handleSubmit(text).catch((e) => {
+          addMessage({ role: "assistant", content: `Error: ${e.message}` });
+          loading = false;
+          status = "error";
+          render();
+        });
+        return;
+      }
+      // Backspace
+      if (ch === "\u007f" || ch === "\b") {
+        input = input.slice(0, -1);
+        render();
+        continue;
+      }
+      // Arrow keys: skip ESC sequences (ESC + [ + A/B/C/D)
+      if (ch === "\x1b") {
+        // mark that we're in escape sequence, skip next 2 chars
+        continue;
+      }
+      // Regular printable char
+      if (ch >= " ") {
+        input += ch;
+        render();
+      }
     }
   };
 
