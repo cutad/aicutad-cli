@@ -71,6 +71,7 @@ async function interactive(auth, baseUrl, model) {
   console.log(`  ${arrow(`Ketik pesan. ${cmd("exit")} untuk keluar.`)}\n`);
 
   const loop = () => {
+    if (rl.closed) { cleanup(); return; }
     rl.question(`${pc.cyan("you")}${pc.dim(" > ")}`, async (input) => {
       const msg = input.trim();
       if (!msg) return loop();
@@ -94,5 +95,9 @@ async function interactive(auth, baseUrl, model) {
       loop();
     });
   };
+  rl.on("close", cleanup);
+  function cleanup() {
+    try { process.stdin.removeAllListeners?.(); } catch {}
+  }
   loop();
 }

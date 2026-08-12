@@ -1,28 +1,22 @@
-// Command utama: login, status, logout
-import { createInterface } from "node:readline";
+// Command utama: login (wizard), status, logout
 import {
   writeAuth, readAuth, clearAuth, resolveBase, isAuthenticated,
 } from "./config.mjs";
 import { listModels } from "./api.mjs";
-import { banner, subtitle, brand, rule, panel, row, ok, fail, info, arrow, spinner, cmd, pc } from "./ui.mjs";
-
-/** Prompt interaktif sederhana. */
-function ask(question) {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(`${question} `, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
+import { banner, subtitle, rule, panel, row, ok, fail, info, spinner, cmd, pc } from "./ui.mjs";
+import { askHidden, askPlain, select, confirm } from "./prompt.mjs";
 
 function header() {
   return `${banner()}\n  ${subtitle()}\n${rule()}`;
 }
 
 /**
- * Login: minta API key (atau dari env CUTAD_API_KEY), lalu fetch daftar model.
+ * Wizard setup pertama kali / login.
+ * 1) minta API key (hidden)
+ * 2) validasi key ke gateway
+ * 3) pilih model default
+ * 4) simpan auth
+ * 5) tawarkan masuk ke chat
  */
 export async function login(argv = []) {
   const { BASE_URL } = resolveBase(argv);
@@ -30,50 +24,71 @@ export async function login(argv = []) {
 
   console.log(`\n${header()}\n`);
 
+  // 1) API key
   const envKey = process.env.CUTAD_API_KEY?.trim();
-  const apiKey = envKey || (await ask(`${pc.cyan("API key?")}`));
-
+  let apiKey = envKey;
   if (!apiKey) {
-    console.error(`\n  ${fail("API key wajib diisi (atau set env CUTAD_API_KEY).")}\n`);
+    console.log(`  ${pc.dim("Masukkan API key dari gateway kamu (terlihat sebagai *).")}`);
+    if (process.env.CUTAD_API_KEY) {
+      apiKey = process.env.CUTAD_API_KEY.trim();
+    } else {
+      apiKey = await askHidden(`${pc.cyan("API key")}${pc.dim(":")}`);
+    }
+  }
+  if (!apiKey) {
+    console.error(`\n  ${fail("API key tidak boleh kosong. Coba lagi.")}\n`);
     process.exit(1);
   }
 
-  let model = process.env.CUTAD_MODEL?.trim()
-    || (process.stdin.isTTY ? await ask(`${pc.cyan("Model default? (kosongkan untuk otomatis)")}`) : undefined);
-
-  writeAuth({ apiKey, baseUrl: BASE_URL, site, model: model || undefined });
-
-  console.log(`\n  ${info(`Menghubungkan ke ${pc.cyan(site)}`)}`);
-  const stop = spinner("Memuat daftar model ...");
+  // 2) Validasi dengan mengambil daftar model
+  console.log(`\n  ${info(`Memvalidasi API key di ${pc.cyan(site)}`)}`);
+  const stop = spinner("Menghubungi gateway ...");
   let models = [];
   try {
     models = await listModels(BASE_URL, apiKey);
     await stop();
   } catch (e) {
     await stop();
-    console.log(`\n  ${fail("Auth tersimpan, tapi tidak bisa memvalidasi gateway.")}`);
-    console.log(`     ${pc.red(e.message)}`);
-    console.log(`     ${pc.dim(`Kamu bisa coba lagi lewat \`${cmd("models")}\`.`)}`);
+    console.log(`\n  ${fail("API key tidak valid atau tidak bisa terhubung ke gateway.")}`);
+    console.log(`     ${pc.dim(e.message)}`);
+    const retry = await confirm("\n  Coba input ulang API key?", true);
+    if (retry) return login(argv);
+    process.exit(1);
   }
 
-  if (models.length > 0) {
-    if (!model) {
-      model = models[0].id;
-      writeAuth({ model });
-    }
-    console.log(`\n${panel("Koneksi OK", [
-      row("Gateway", pc.cyan(site)),
-      row("Status", `${pc.green("terhubung")}`),
-      row("Model", `${pc.bold(model)}  ${pc.dim(`(${models.length} tersedia)`)}`),
-    ])}\n`);
-  } else {
-    console.log(`\n${panel("Selesai", [
-      row("Auth tersimpan", pc.dim("~/.cutad/auth.json")),
-      row("Base URL", pc.cyan(BASE_URL)),
-    ])}\n`);
-  }
+  // 3) Pilihan model
+  console.log(`\n  ${ok(`API key valid — ${pc.bold(String(models.length))} model ditemukan.`)}`);
+  const model = await pickModel(models, process.env.CUTAD_MODEL);
 
-  console.log(`  ${arrow(`Mulai dengan: ${cmd("chat 'pesanmu'")}`)}\n`);
+  // 4) Simpan
+  writeAuth({ apiKey, baseUrl: BASE_URL, site, model });
+
+  console.log(`\n${panel("Setup selesai", [
+    row("API key", ok(pc.dim("valid"))),
+    row("Model", pc.bold(model)),
+    row("Gateway", pc.cyan(site)),
+    row("Disimpan", pc.dim("~/.cutad/auth.json")),
+  ], { width: 60 })}\n`);
+
+  // 5) Tawarkan chat
+  const go = await confirm(`  ${pc.cyan("Langsung masuk mode chat?")}`);
+  if (go) {
+    const { chat } = await import("./chat.mjs");
+    return chat("", argv);
+  }
+  console.log(`  ${arrow(`Kapan saja mulai dengan: ${cmd("aicutad chat")}`)}\n`);
+}
+
+/** Pemilihan model default (interaktif / nomor / env override). */
+async function pickModel(models, envModel) {
+  const ids = models.map((m) => m.id);
+  if (envModel && ids.includes(envModel)) {
+    console.log(`\n  ${info(`Model default dari env: ${pc.bold(envModel)}`)}`);
+    return envModel;
+  }
+  console.log(`\n  ${pc.dim("Pilih model default (pakai ↑/↓ lalu Enter):")}`);
+  const chosen = await select("Model default", ids);
+  return chosen || ids[0];
 }
 
 /** Status: tampilkan info login + jumlah model. */
@@ -86,9 +101,9 @@ export async function status(argv = []) {
   if (!isAuthenticated()) {
     console.log(panel("Status", [
       row("Gateway", pc.cyan(auth.baseUrl || BASE_URL)),
-      row("Login", `${pc.yellow("belum login")}`),
-      row("Saran", `${cmd("login")}  untuk mulai`),
-    ]));
+      row("Login", pc.yellow("belum login")),
+      row("Saran", `${cmd("aicutad login")}  untuk mulai`),
+    ], { width: 60 }));
     console.log("");
     return;
   }
@@ -100,22 +115,21 @@ export async function status(argv = []) {
     await stop();
   } catch (e) {
     await stop();
+    console.log(`\n  ${fail("Tidak bisa menjangkau gateway. API key mungkin kedaluwarsa.")}\n`);
+    return;
   }
 
   const cards = [
-    row("Status", `${pc.green("aktif")}`),
+    row("Status", pc.green("aktif")),
     row("API key", pc.dim(maskKey(auth.apiKey))),
     row("Base URL", pc.cyan(auth.baseUrl || BASE_URL)),
   ];
   if (auth.model) cards.push(row("Model", pc.bold(auth.model)));
   if (models.length > 0) {
-    const ids = models.slice(0, 4).map((m) => m.id).join(", ");
-    cards.push(row("Model tersedia", `${pc.bold(`${models.length}`)}  ${pc.dim(ids)}${models.length > 4 ? pc.dim(", …") : ""}`));
-  } else if (models.length === 0) {
-    cards.push(row("Model tersedia", pc.yellow("gagal dimuat")));
+    cards.push(row("Model", `${pc.bold(String(models.length))} tersedia`));
   }
 
-  console.log(panel("Status", cards));
+  console.log(panel("Status", cards, { width: 60 }));
   console.log("");
 }
 

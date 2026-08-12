@@ -47,6 +47,19 @@ program
     return import("../src/chat.mjs").then((m) => m.chat(promptText, buildArgv(opts)));
   });
 
+// │ Tanpa sub-command (hanya `aicutad`)            │
+// │ - belum login  → masuk wizard setup (input key)│
+// │ - sudah login  → langsung mode chat            │
+program.action(async () => {
+  const { isAuthenticated } = await import("../src/config.mjs");
+  if (!isAuthenticated()) {
+    const { login } = await import("../src/commands.mjs");
+    return login([]);
+  }
+  const { chat } = await import("../src/chat.mjs");
+  return chat("", []);
+});
+
 program.parseAsync(process.argv);
 
 // Helper: ubah option commander menjadi bentuk argv yang dipakai modul
