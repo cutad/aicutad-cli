@@ -20,20 +20,34 @@ npm install -g aicutad-cli
 
 → menyediakan command `aicutad`.
 
-## Memulai dalam 3 langkah
+## Memulai (wizard interaktif)
+
+Jalankan `aicutad` begitu saja — pertama kali akan membawa kamu ke **setup wizard**:
 
 ```bash
-# 1. Login (sekali saja) — minta API key dari gateway
-aicutad login
+aicutad
+```
 
-# Non-interaktif (cocok untuk CI/deploy):
-CUTAD_API_KEY="sk-..." aicutad login
+Wizard akan:
+1. Minta **API key** (tersembunyi `***`) dan **memvalidasinya** ke gateway
+2. Tampilkan daftar **model** untuk dipilih (pakai ↑/↓ + Enter)
+3. Simpan konfigurasi ke `~/.cutad`
+4. Tanya mau langsung masuk mode chat
 
-# 2. Cek status & daftar model
-aicutad status
-aicutad models
+Setelah setup, `aicutad` langsung membuka **mode chat interaktif**.
 
-# 3. Mulai ngobrol
+### Login / konfigurasi manual
+
+```bash
+aicutad login            # ulangi wizard (ganti API key / model)
+aicutad status           # cek status login & model
+aicutad models           # daftar semua model
+aicutad logout           # hapus kredensial lokal
+```
+
+### Chat
+
+```bash
 aicutad chat "jelaskan apa itu closure di javascript"
 aicutad chat "buatkan function untuk fetch data di node" --model <nama-model>
 ```
