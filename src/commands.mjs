@@ -76,7 +76,6 @@ export async function login(argv = []) {
     const { chat } = await import("./chat.mjs");
     return chat("", argv);
   }
-  console.log(`  ${arrow(`Kapan saja mulai dengan: ${cmd("aicutad chat")}`)}\n`);
 }
 
 /** Pemilihan model default (interaktif / nomor / env override). */

@@ -1,62 +1,39 @@
 // ─────────────────────────────────────────────────────────────
 // Prompt interaktif — masked input & arrow-key selector
-// Dibangun manual (tanpa dependency) biar terasa seperti CLI perusahaan.
+// Dibangun manual (tanpa dependency ekstra).
+//
+// Prinsip penting (biar tidak ada bug):
+//  - Handler stdin disimpan ke VARIABEL di scope yang SAMA dgn `cleanup`,
+//    supaya `removeListener` benar-benar bisa melepasnya.
+//  - Raw mode stdin diatur lewat satu helper enter/exit yang konsisten.
+//  - Non-TTY (CI / pipe) memakai input nomor/index polos.
 // ─────────────────────────────────────────────────────────────
 import { createInterface } from "node:readline";
 import pc from "picocolors";
 
-const isTTY = () => Boolean(process.stdin.isTTY && process.stdout.isTTY);
+const stdin = process.stdin;
+const stdout = process.stdout;
 
-/**
- * Input dengan karakter tersembunyi (untuk API key).
- * Fallback: input polos bila bukan TTY.
- * @param {string} label
- * @returns {Promise<string>}
- */
-export function askHidden(label) {
-  if (!isTTY()) {
-    return askPlain(label);
-  }
-  process.stdout.write(`${label} `);
-  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  let value = "";
-  return new Promise((resolve) => {
-    process.stdin.on("data", function onData(chunk) {
-      const str = chunk.toString();
-      for (const ch of str) {
-        if (ch === "\n" || ch === "\r") {
-          process.stdin.setRawMode(false);
-          rl.write("\n");
-          process.stdin.removeListener("data", onData);
-          rl.close();
-          resolve(value);
-          return;
-        }
-        if (ch === "\u0003") { // Ctrl+C
-          process.stdin.setRawMode(false);
-          rl.write("\n");
-          process.stdin.removeListener("data", onData);
-          rl.close();
-          process.exit(130);
-        }
-        if (ch === "\u007f" || ch === "\b") { // backspace
-          value = value.slice(0, -1);
-          process.stdout.write("\b \b");
-        } else {
-          value += ch;
-          process.stdout.write("*");
-        }
-      }
-    });
-  });
+const isTTY = () => Boolean(stdin.isTTY && stdout.isTTY);
+
+/** Aktifkan raw mode + resume stdin, kembalikan fungsi pemulihan. */
+function enterRaw() {
+  if (stdin.isTTY) stdin.setRawMode(true);
+  stdin.resume();
 }
 
-/** Input polos satu baris. */
+/** Nonaktifkan raw mode + pause stdin. */
+function exitRaw() {
+  if (stdin.isTTY) stdin.setRawMode(false);
+  stdin.pause();
+}
+
+/**
+ * Input satu baris (polos, tanpa masking).
+ */
 export function askPlain(question) {
   return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const rl = createInterface({ input: stdin, output: stdout });
     rl.question(`${question} `, (answer) => {
       rl.close();
       resolve(answer.trim());
@@ -65,8 +42,58 @@ export function askPlain(question) {
 }
 
 /**
- * Pilihan dari daftar pakai arrow key ↑/↓ dan Enter.
- * Non-TTY => prompt nomor.
+ * Input dengan karakter tersembunyi (untuk API key).
+ * Fallback ke input polos bila bukan TTY.
+ * @param {string} label
+ * @returns {Promise<string>}
+ */
+export function askHidden(label) {
+  if (!isTTY()) {
+    return askPlain(label);
+  }
+  return new Promise((resolve) => {
+    let value = "";
+    stdout.write(`${label} `);
+    enterRaw();
+
+    const onData = (chunk) => {
+      const str = chunk.toString();
+      for (const ch of str) {
+        if (ch === "\n" || ch === "\r") {
+          stdout.write("\n");
+          cleanup();
+          resolve(value);
+          return;
+        }
+        if (ch === "\u0003") { // Ctrl+C
+          stdout.write("\n");
+          cleanup();
+          process.exit(130);
+        }
+        if (ch === "\u007f" || ch === "\b") { // backspace
+          if (value.length > 0) {
+            value = value.slice(0, -1);
+            stdout.write("\b \b");
+          }
+        } else if (ch >= " ") { // abaikan karakter kontrol lain
+          value += ch;
+          stdout.write("*");
+        }
+      }
+    };
+
+    function cleanup() {
+      exitRaw();
+      stdin.removeListener("data", onData);
+    }
+
+    stdin.on("data", onData);
+  });
+}
+
+/**
+ * Pilihan dari daftar memakai arrow key ↑/↓ dan Enter.
+ * Non-TTY => pilihan lewat nomor.
  * @param {string} label
  * @param {string[]} choices
  * @returns {Promise<string|null>} pilihan yang dipilih
@@ -77,49 +104,52 @@ export function select(label, choices) {
   }
   return new Promise((resolve) => {
     let idx = 0;
-    process.stdout.write(`\n${label}\n`);
+    const listHeight = choices.length + 1; // baris label + seluruh daftar
+
+    stdout.write(`\n${label}\n`);
     const render = () => {
+      // naik ke posisi awal daftar, lalu tulis ulang
+      stdout.write(`\x1b[${listHeight}A`);
       const lines = choices.map((c, i) => {
         const mark = i === idx ? pc.bgCyan(pc.black(" > ")) : "   ";
         const text = i === idx ? pc.cyan(c) : pc.white(c);
         return `  ${mark} ${text}`;
       });
-      const height = choices.length + 1;
-      // clear previous
-      process.stdout.write(`\x1b[${height}A`);
-      process.stdout.write(lines.join("\n") + "\n");
+      stdout.write(lines.join("\n") + "\n");
     };
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
+
+    enterRaw();
     render();
-    process.stdin.on("data", function onData(chunk) {
+
+    const onData = (chunk) => {
       const str = chunk.toString();
       if (str === "\u0003") { // Ctrl+C
+        stdout.write("\x1b[?25h");
         cleanup();
         process.exit(130);
       }
       if (str === "\r" || str === "\n") { // Enter
         cleanup();
-        const chosen = choices[idx];
-        process.stdout.write(`\x1b[${choices.length}A\x1b[J`);
-        resolve(chosen);
+        // hapus blok daftar dari layar lalu resolve
+        stdout.write(`\x1b[${listHeight - 1}A\x1b[J`);
+        resolve(choices[idx]);
         return;
       }
-      // Escape sequences untuk arrow keys
+      // escape sequence arrow keys: ESC [ A/B/C/D
       const kb = chunk.slice ? chunk : Buffer.from(str);
       if (kb.length === 3 && kb[0] === 27 && kb[1] === 91) {
         if (kb[2] === 65) idx = (idx - 1 + choices.length) % choices.length; // up
         else if (kb[2] === 66) idx = (idx + 1) % choices.length; // down
         render();
-      } else if (kb[0] === 13) {
-        // some terminals send \r only
       }
-    });
+    };
+
     function cleanup() {
-      process.stdin.setRawMode(false);
-      process.stdin.removeListener("data", onData);
-      process.stdin.pause();
+      exitRaw();
+      stdin.removeListener("data", onData);
     }
+
+    stdin.on("data", onData);
   });
 }
 
@@ -142,7 +172,7 @@ export function confirm(question, def = true) {
   const hint = def ? "(Y/n)" : "(y/N)";
   return new Promise((resolve) => {
     if (!isTTY()) { resolve(def); return; }
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const rl = createInterface({ input: stdin, output: stdout });
     rl.question(`${question} ${pc.dim(hint)} `, (answer) => {
       rl.close();
       const a = answer.trim().toLowerCase();
