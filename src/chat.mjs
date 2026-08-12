@@ -1,4 +1,4 @@
-// Chat ke gateway + interactive REPL
+// Chat ke gateway + interactive REPL + TUI launcher
 import { createInterface } from "node:readline";
 import { readAuth, resolveBase } from "./config.mjs";
 import { chatCompletion } from "./api.mjs";
@@ -11,11 +11,12 @@ const SYSTEM_PROMPT = [
 ].join(" ");
 
 /**
- * Jalankan chat sekali lalu cetak jawabannya.
- * @param {string} prompt teks prompt (kosong => interaktif)
+ * Jalankan chat.
+ * @param {string} prompt teks prompt (kosong => interaktif/TUI)
  * @param {string[]} argv argumen CLI
+ * @param {boolean} useTui pakai TUI full-screen
  */
-export async function chat(prompt, argv = []) {
+export async function chat(prompt, argv = [], useTui = false) {
   const auth = readAuth();
   if (!auth.apiKey) {
     console.error(`\n  ${fail("Belum login — jalankan `login` dulu.")}`);
@@ -25,6 +26,10 @@ export async function chat(prompt, argv = []) {
   const { BASE_URL } = resolveBase(argv);
   const promptText = (prompt || "").trim();
   const model = auth.model || reqModel(argv);
+
+  if (!promptText && useTui) {
+    return launchTui(auth, BASE_URL, model);
+  }
 
   if (!promptText) {
     return interactive(auth, BASE_URL, model);
@@ -59,6 +64,21 @@ function reqModel(argv) {
 /** Cetak jawaban dengan pemisah rapi. */
 function printAnswer(content, model) {
   console.log(`\n${pc.dim(rule("─", 56))}\n${content}\n${pc.dim(rule("─", 56))}  ${pc.dim(`[${model}]`)}\n`);
+}
+
+/** Launch TUI full-screen (React + Ink). */
+async function launchTui(auth, baseUrl, model) {
+  const { createSession } = await import("./session/index.mjs");
+  const session = createSession(model, "cutad");
+  const { startTUI } = await import("./tui/App.mjs");
+  return startTUI({
+    baseUrl,
+    apiKey: auth.apiKey,
+    model,
+    provider: "cutad",
+    session,
+    systemPrompt: SYSTEM_PROMPT,
+  });
 }
 
 /** REPL interaktif berkelanjutan. */

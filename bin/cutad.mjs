@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Cutad CLI — entrypoint utama
+// aicutad CLI — entrypoint utama (v0.2.0)
 import { Command } from "commander";
 import { createRequire } from "node:module";
-import { resolveBase } from "../src/config.mjs";
+import { isAuthenticated } from "../src/config.mjs";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json");
@@ -14,57 +14,129 @@ program
   .description("AI CUTAD — AI coding agent CLI (gateway ai.cutad.web.id)")
   .version(pkg.version, "-v, --version", "tampilkan versi");
 
+// │ login — setup wizard (hidden input, validasi, pilih model)      │
 program
   .command("login")
-  .description("Masuk / simpan API key agar bisa memanggil model")
-  .option("-b, --base <url>", "Base URL gateway (default: ai.cutad.web.id/v1)")
+  .description("Setup wizard: masukkan API key, validasi, pilih model")
+  .option("-b, --base <url>", "Base URL gateway")
   .action((opts) => import("../src/commands.mjs").then((m) => m.login(buildArgv(opts))));
 
+// │ status — info login + model                                       │
 program
   .command("status")
-  .description("Tampilkan status login + daftar model")
+  .description("Status login + daftar model")
   .option("-b, --base <url>", "Base URL gateway")
   .action((opts) => import("../src/commands.mjs").then((m) => m.status(buildArgv(opts))));
 
+// │ logout — hapus kredensial                                         │
 program
   .command("logout")
   .description("Hapus kredensial lokal")
   .action(() => import("../src/commands.mjs").then((m) => m.logout()));
 
+// │ models — daftar model                                             │
 program
   .command("models")
-  .description("Tampilkan daftar model dari gateway")
+  .description("Daftar model dari gateway")
   .option("-b, --base <url>", "Base URL gateway")
   .action((opts) => import("../src/models.mjs").then((m) => m.models(buildArgv(opts))));
 
+// │ chat — kirim pesan / mode interaktif / TUI                        │
 program
   .command("chat [prompt...]")
-  .description("Kirim pesan ke model (kosongkan untuk mode interaktif)")
+  .description("Kirim pesan ke model (kosongkan untuk TUI)")
   .option("-b, --base <url>", "Base URL gateway")
-  .option("-m, --model <model>", "Model yang dipakai (override default)")
+  .option("-m, --model <model>", "Model yang dipakai")
+  .option("--tui", "Pakai TUI full-screen (React + Ink)")
   .action((prompt, opts) => {
     const promptText = Array.isArray(prompt) ? prompt.join(" ") : (prompt || "");
-    return import("../src/chat.mjs").then((m) => m.chat(promptText, buildArgv(opts)));
+    return import("../src/chat.mjs").then((m) => m.chat(promptText, buildArgv(opts), opts.tui));
   });
 
-// │ Tanpa sub-command (hanya `aicutad`)            │
-// │ - belum login  → masuk wizard setup (input key)│
-// │ - sudah login  → langsung mode chat            │
+// │ agents — daftar / jalankan subagent                               │
+program
+  .command("agents")
+  .description("Daftar subagent tersedia")
+  .action(() => import("../src/agent/index.mjs").then((m) => {
+    const agents = m.listAgents();
+    agents.forEach((a) => console.log(`  ${a.name.padEnd(20)} ${a.description}`));
+  }));
+
+// │ sessions — daftar session tersimpan                                │
+program
+  .command("sessions")
+  .description("Daftar session tersimpan")
+  .option("--load <id>", "Muat session berdasarkan ID")
+  .option("--delete <id>", "Hapus session")
+  .option("--export <id> <path>", "Ekspor session")
+  .action((opts) => {
+    import("../src/session/index.mjs").then((m) => {
+      if (opts.delete) {
+        m.deleteSession(opts.delete);
+        console.log(`  Session ${opts.delete} dihapus.`);
+        return;
+      }
+      const sessions = m.listSessions();
+      if (sessions.length === 0) {
+        console.log("  Belum ada session.");
+        return;
+      }
+      sessions.forEach((s) => console.log(`  ${s.id}  ${s.model.padEnd(30)} ${s.messageCount} pesan  ${s.updatedAt}`));
+    });
+  });
+
+// │ mcp — kelola MCP server                                            │
+program
+  .command("mcp")
+  .description("Kelola MCP (Model Context Protocol) server")
+  .option("--list", "Daftar MCP server")
+  .option("--add <name>", "Tambah MCP server")
+  .option("--remove <name>", "Hapus MCP server")
+  .option("--connect <name>", "Connect & list tools")
+  .action((opts) => import("../src/mcp/index.mjs").then(async (m) => {
+    if (opts.remove) { m.removeMcpServer(opts.remove); console.log(`  MCP server ${opts.remove} dihapus.`); return; }
+    if (opts.connect) {
+      try {
+        const { tools } = await m.connectMcpServer(opts.connect);
+        console.log(`  Tools di ${opts.connect} (${tools.length}):`);
+        tools.forEach((t) => console.log(`   • ${t.name}: ${t.description?.slice(0, 60) || ""}`));
+      } catch (e) { console.error(`  Error: ${e.message}`); }
+      return;
+    }
+    const servers = m.listMcpServers();
+    if (servers.length === 0) { console.log("  Belum ada MCP server."); return; }
+    servers.forEach((s) => console.log(`  ${s.name.padEnd(20)} ${s.command} ${(s.args||[]).join(" ")} ${s.enabled ? "✓" : "✗"}`));
+  }));
+
+// │ Tanpa sub-command:                                                │
+// │ - belum login → wizard                                            │
+// │ - sudah login → TUI full-screen                                   │
 program.action(async () => {
-  const { isAuthenticated } = await import("../src/config.mjs");
   if (!isAuthenticated()) {
     const { login } = await import("../src/commands.mjs");
     return login([]);
   }
-  const { chat } = await import("../src/chat.mjs");
-  return chat("", []);
+  // Launch TUI
+  const { readAuth, resolveBase } = await import("../src/config.mjs");
+  const auth = readAuth();
+  const { BASE_URL } = resolveBase([]);
+  const { createSession } = await import("../src/session/index.mjs");
+  const session = createSession(auth.model, "cutad");
+  const { startTUI } = await import("../src/tui/App.mjs");
+  return startTUI({
+    baseUrl: BASE_URL,
+    apiKey: auth.apiKey,
+    model: auth.model,
+    provider: "cutad",
+    session,
+    systemPrompt: "Kamu adalah AI CUTAD, asisten AI coding. Jawab ringkas, praktis, sertakan contoh kode bila relevan.",
+  });
 });
 
 program.parseAsync(process.argv);
 
-// Helper: ubah option commander menjadi bentuk argv yang dipakai modul
 function buildArgv(opts) {
-  const args = ["node", "cutad"];
+  const args = ["node", "aicutad"];
   if (opts?.base) args.push("--base", opts.base);
   if (opts?.model) args.push("--model", opts.model);
   return args;
