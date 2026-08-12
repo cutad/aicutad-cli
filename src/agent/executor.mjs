@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 
 const MAX_OUTPUT = 50000; // batas output per tool
 
@@ -107,27 +107,22 @@ function searchFiles(pattern, dirPath, cwd) {
 
 function runCommand(command, cwd) {
   try {
-    const result = execSync(command, {
+    const result = spawnSync("bash", ["-c", command], {
       encoding: "utf8",
       timeout: 60000,
       maxBuffer: 1024 * 1024 * 5,
       cwd,
-      stderr: "pipe",
     });
-    let output = result || "";
-    // juga tangkap stderr
-    try {
-      const errResult = execSync(command + " 2>&1 1>/dev/null || true", {
-        encoding: "utf8",
-        timeout: 60000,
-        maxBuffer: 1024 * 1024 * 5,
-        cwd,
-      });
-      if (errResult) output += (output ? "\n--- stderr ---\n" : "") + errResult;
-    } catch {}
-    return truncate(output) || "(command selesai, tidak ada output)";
+    let output = "";
+    if (result.stdout) output += result.stdout;
+    if (result.stderr) {
+      output += (output ? "\n--- stderr ---\n" : "") + result.stderr;
+    }
+    if (result.status !== 0 && result.status !== null) {
+      output += (output ? "\n" : "") + `(exit code: ${result.status})`;
+    }
+    return truncate(output) || `(command selesai, exit code: ${result.status ?? 0})`;
   } catch (e) {
-    const output = (e.stdout || "") + (e.stderr ? "\n--- stderr ---\n" + e.stderr : "");
-    return truncate(output || e.message);
+    return `Error: ${e.message}`;
   }
 }

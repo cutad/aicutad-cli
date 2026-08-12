@@ -127,6 +127,10 @@ export async function runAgentLoop({
 
     // Tidak ada tool_calls → model selesai
     if (choice.finish_reason === "stop" || !assistantMessage.tool_calls) {
+      // Edge case: model return kosong sama sekali
+      if (!finalResult && !assistantMessage.content) {
+        finalResult = "(Model tidak memberikan respons.)";
+      }
       break;
     }
   }
