@@ -1,6 +1,6 @@
 {
   "name": "aicutad-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "AI coding agent CLI yang terhubung ke gateway AI cutad.web.id (OpenAI-compatible /v1)",
   "type": "module",
   "bin": {

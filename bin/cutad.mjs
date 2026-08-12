@@ -62,6 +62,20 @@ program
     agents.forEach((a) => console.log(`  ${a.name.padEnd(20)} ${a.description}`));
   }));
 
+// │ agent — jalankan agentic loop (baca/tulis file, run command)     │
+program
+  .command("agent <task...>")
+  .description("Jalankan agent otonom: baca/tulis file, run command, selesaikan tugas")
+  .option("-m, --model <model>", "Model yang dipakai")
+  .option("-d, --dir <path>", "Working directory (default: cwd)")
+  .action((task, opts) => {
+    const taskText = Array.isArray(task) ? task.join(" ") : task;
+    return import("../src/agent/run.mjs").then((m) => m.runCliAgent(taskText, {
+      model: opts.model,
+      cwd: opts.dir,
+    }));
+  });
+
 // │ sessions — daftar session tersimpan                                │
 program
   .command("sessions")

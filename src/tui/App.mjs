@@ -238,28 +238,62 @@ export async function startTUI(config) {
         showHelp = false;
         break;
       default:
-        if (command === "/agent" && parts[1]) {
-          const agentName = parts[1];
-          const task = parts.slice(2).join(" ");
-          const agent = getAgent(agentName);
-          if (!agent) {
-            addMessage({ role: "system", content: `Agent tidak dikenal: ${agentName}` });
-            break;
-          }
-          loading = true;
-          addMessage({ role: "user", content: `[delegate → ${agentName}] ${task}` });
-          render();
-          try {
-            const result = await runAgent(agent, task, {
-              baseUrl: config.baseUrl,
-              apiKey: config.apiKey,
-              model: model || config.model,
-            });
-            addMessage({ role: "assistant", content: result });
-          } catch (e) {
-            addMessage({ role: "assistant", content: `Agent error: ${e.message}` });
-          } finally {
-            loading = false;
+        if (command === "/agent" && parts.length >= 2) {
+          // Cek apakah parts[1] adalah nama subagent atau bagian dari task
+          const possibleAgent = parts[1];
+          const agent = getAgent(possibleAgent);
+
+          if (agent && parts.length >= 3) {
+            // /agent cutad-search "riset X" → subagent delegate
+            const task = parts.slice(2).join(" ");
+            loading = true;
+            addMessage({ role: "user", content: `[delegate → ${possibleAgent}] ${task}` });
+            render();
+            try {
+              const result = await runAgent(agent, task, {
+                baseUrl: config.baseUrl,
+                apiKey: config.apiKey,
+                model: model || config.model,
+              });
+              addMessage({ role: "assistant", content: result });
+            } catch (e) {
+              addMessage({ role: "assistant", content: `Agent error: ${e.message}` });
+            } finally {
+              loading = false;
+            }
+          } else {
+            // /agent <task> → agentic loop (baca/tulis file, run command)
+            const task = parts.slice(1).join(" ");
+            loading = true;
+            status = "agent";
+            addMessage({ role: "user", content: `[agent] ${task}` });
+            render();
+
+            const { runAgentLoop } = await import("../agent/loop.mjs");
+            try {
+              const result = await runAgentLoop({
+                baseUrl: config.baseUrl,
+                apiKey: config.apiKey,
+                model: model || config.model,
+                task,
+                cwd: process.cwd(),
+                onToolCall: (name, args) => {
+                  addMessage({ role: "system", content: `⚡ ${name}(${Object.keys(args).join(", ")})` });
+                  render();
+                },
+                onToolResult: (name, result) => {
+                  const preview = result.split("\n").slice(0, 2).join(" ");
+                  addMessage({ role: "system", content: `✓ ${name}: ${preview.slice(0, 100)}` });
+                  render();
+                },
+              });
+              addMessage({ role: "assistant", content: result.result || "(selesai)" });
+            } catch (e) {
+              addMessage({ role: "assistant", content: `Agent error: ${e.message}` });
+            } finally {
+              loading = false;
+              status = "ready";
+            }
           }
         } else {
           addMessage({ role: "system", content: `Perintah tidak dikenal: ${command}. Ketik /help` });
