@@ -47,7 +47,7 @@ program
   .description("Kirim pesan ke model (kosongkan untuk TUI)")
   .option("-b, --base <url>", "Base URL gateway")
   .option("-m, --model <model>", "Model yang dipakai")
-  .option("--tui", "Pakai TUI full-screen (React + Ink)")
+  .option("--tui", "Pakai TUI full-screen (native ANSI)")
   .action((prompt, opts) => {
     const promptText = Array.isArray(prompt) ? prompt.join(" ") : (prompt || "");
     return import("../src/chat.mjs").then((m) => m.chat(promptText, buildArgv(opts), opts.tui));

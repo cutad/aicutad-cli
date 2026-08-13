@@ -66,7 +66,7 @@ function printAnswer(content, model) {
   console.log(`\n${pc.dim(rule("─", 56))}\n${content}\n${pc.dim(rule("─", 56))}  ${pc.dim(`[${model}]`)}\n`);
 }
 
-/** Launch TUI full-screen (React + Ink). */
+/** Launch TUI full-screen (native ANSI). */
 async function launchTui(auth, baseUrl, model) {
   const { createSession } = await import("./session/index.mjs");
   const session = createSession(model, "cutad");
