@@ -131,13 +131,14 @@ async function bootSequence(stdout, W, H) {
   // ── Typewriter logo ──
   const logoText = "aicutad-cli";
   const logoRow = winY + 2;
-  const logoCol = winX + Math.floor((winW - logoText.length - 2) / 2);
+  const logoCol = winX + Math.floor((winW - logoText.length) / 2);
 
-  stdout.write(A.move(logoRow, logoCol) + C.bold(C.teal("\u25C6")) + " ");
+  // Clear logo area then typewriter
+  stdout.write(A.move(logoRow, logoCol) + " ".repeat(logoText.length));
   await sleep(100);
   for (let i = 0; i < logoText.length; i++) {
     const ch = logoText[i];
-    stdout.write(A.move(logoRow, logoCol + 2 + i) + C.bold(C.cyan(ch)));
+    stdout.write(A.move(logoRow, logoCol + i) + C.bold(C.cyan(ch)));
     await sleep(35);
   }
 
@@ -210,11 +211,11 @@ async function bootSequence(stdout, W, H) {
   // ── Final flash ──
   await sleep(200);
   // Flash the logo bright
-  stdout.write(A.move(logoRow, logoCol) + C.bold(C.teal("\u25C6")) + " " + C.bold(C.cyan(logoText)));
+  stdout.write(A.move(logoRow, logoCol) + C.bold(C.cyan(logoText)));
   await sleep(150);
 
   // "Ready" badge
-  const readyText = "\u25C6 READY";
+  const readyText = "READY";
   const readyCol = winX + Math.floor((winW - readyText.length) / 2);
   stdout.write(A.move(barRow + 1, readyCol) + C.bold(C.green(readyText)));
   await sleep(300);
@@ -422,7 +423,7 @@ export async function startTUI(config) {
     const clock = String(now.getHours()).padStart(2, "0") + ":" +
                   String(now.getMinutes()).padStart(2, "0") + ":" +
                   String(now.getSeconds()).padStart(2, "0");
-    const headerLeft = " " + C.bold(C.teal("\u25C6")) + " " + C.bold(C.cyan("aicutad-cli")) +
+    const headerLeft = " " + C.bold(C.cyan("aicutad-cli")) +
                        " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray("v0.4.0");
     const headerRight = C.dim(clock);
     const headerPad = Math.max(1, W - visibleLen(headerLeft) - visibleLen(headerRight) - 1);

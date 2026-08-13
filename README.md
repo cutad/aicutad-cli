@@ -1,6 +1,6 @@
 <div align="center">
 
-# ◆ aicutad-cli
+# aicutad-cli
 
 **AI Coding Agent CLI** — baca, tulis, edit file & jalankan command shell otonom lewat terminal.
 
@@ -25,7 +25,7 @@ Kamu kasih tugas, agent bekerja otonom: baca → tulis → verifikasi → lapor.
 ```
 $ aicutad agent "buat file hello.js berisi console.log hello world"
 
-  ◆ aicutad-cli agent mode · v0.4.0
+  aicutad-cli agent mode · v0.4.0
   model: deepseek-ai/deepseek-v4-pro  dir: /root/project
   ────────────────────────────────────────────────────────────
   › buat file hello.js berisi console.log hello world
@@ -40,7 +40,7 @@ $ aicutad agent "buat file hello.js berisi console.log hello world"
   ⚡ Run ✓ (2 baris)
 
   ────────────────────────────────────────────────────────────
-  ◆ aicutad-cli selesai · 4 iterasi · 3 tools · 1.2s
+  aicutad-cli selesai · 4 iterasi · 3 tools · 1.2s
 
   File hello.js berhasil dibuat & diverifikasi. Output: "Hello, World!"
 ```
@@ -106,7 +106,7 @@ Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. 
 ## TUI Full-Screen
 
 ```
- ◆ aicutad-cli │ AI Coding Agent CLI v0.4.0          19:20:35
+ aicutad-cli │ AI Coding Agent CLI v0.4.0          19:20:35
  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  ┌─ you 19:20
  │ ada apa di sini

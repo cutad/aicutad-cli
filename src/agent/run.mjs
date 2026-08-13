@@ -59,7 +59,7 @@ export async function runCliAgent(task, opts = {}) {
 
   // ── Boot header ────────────────────────────────────────────
   console.log();
-  console.log("  " + pc.cyan("\u25C6") + " " + pc.bold(pc.cyan("aicutad-cli")) + " " + pc.dim("agent mode \u00B7 v0.4.0"));
+  console.log("  " + pc.bold(pc.cyan("aicutad-cli")) + " " + pc.dim("agent mode \u00B7 v0.4.0"));
   console.log("  " + pc.dim("model:") + " " + pc.white(model) + "  " + pc.dim("dir:") + " " + pc.white(cwd));
   console.log("  " + pc.dim("\u2501".repeat(60)));
   console.log();
@@ -146,7 +146,7 @@ export async function runCliAgent(task, opts = {}) {
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
   console.log("  " + pc.dim("\u2501".repeat(60)));
   console.log();
-  console.log("  " + pc.cyan("\u25C6 ") + pc.bold("aicutad-cli") + " " + pc.dim("selesai \u00B7 " + result.iterations + " iterasi \u00B7 " + result.toolCalls + " tools \u00B7 " + elapsed));
+  console.log("  " + pc.bold(pc.cyan("aicutad-cli")) + " " + pc.dim("selesai \u00B7 " + result.iterations + " iterasi \u00B7 " + result.toolCalls + " tools \u00B7 " + elapsed));
   console.log();
 
   if (result.result) {

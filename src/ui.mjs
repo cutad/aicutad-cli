@@ -7,9 +7,9 @@ import pc from "picocolors";
 // Aksen utama — satu warna biar profesional
 export const ACCENT = pc.cyan;
 
-/** Banner clean — "◆ aicutad-cli" dengan aksen cyan. */
+/** Banner clean — "aicutad-cli" dengan aksen cyan. */
 export function banner() {
-  return pc.bold(ACCENT("\u25C6")) + " " + pc.bold(ACCENT("aicutad-cli"));
+  return pc.bold(ACCENT("aicutad-cli"));
 }
 
 /** Nama brand. */
