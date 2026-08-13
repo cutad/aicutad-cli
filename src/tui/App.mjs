@@ -20,6 +20,8 @@
 import { chatCompletion, listModels } from "../api.mjs";
 import { listAgents } from "../agent/index.mjs";
 import { listSessions, saveSession, appendMessage, createSession } from "../session/index.mjs";
+import { formatTokens } from "../agent/cost.mjs";
+import { estimateMessageTokens } from "../agent/context.mjs";
 
 // ── 256-color palette ────────────────────────────────────────
 const C = {
@@ -260,6 +262,9 @@ export async function startTUI(config) {
   let iterCount = 0;
   let thinkingText = "";
   let renderQueued = false;
+  // Cost & context tracking state
+  let costInfo = null;   // { totalTokens, costFormatted, calls }
+  let ctxPercent = 0;    // context window usage percentage
   let prevLineCount = 0;
   let booting = true;
   let modal = null; // { type, items, selected, scroll, state }
@@ -480,11 +485,26 @@ export async function startTUI(config) {
     const sLabel = loading ? C.bYellow("bekerja") : status === "error" ? C.bRed("error") : C.bGreen("ready");
     const msgCount = messages.length + " pesan";
     const provider = config.provider || "cutad";
-    const maxModelLen = W - 32;
+    const maxModelLen = W - 52;
     const modelDisplay = visibleLen(model) > maxModelLen ? model.slice(0, maxModelLen - 1) + "\u2026" : model;
-    const statusLine = " " + sIcon + " " + C.gray("\u2502") + " " + sLabel + " " + C.gray("\u2502") +
-                       " " + C.bold(modelDisplay) + " " + C.gray("\u2502") + " " + C.dim(msgCount) +
-                       " " + C.gray("\u2502") + " " + C.dim(provider);
+
+    // Build status segments
+    let statusLine = " " + sIcon + " " + C.gray("\u2502") + " " + sLabel + " " + C.gray("\u2502") +
+                     " " + C.bold(modelDisplay) + " " + C.gray("\u2502") + " " + C.dim(msgCount);
+
+    // Cost segment — tampilkan tokens + biaya
+    if (costInfo) {
+      const costStr = C.dim(formatTokens(costInfo.totalTokens) + " tok") + " " + C.gray("\u2502") + " " + C.dim(costInfo.costFormatted);
+      statusLine += " " + C.gray("\u2502") + " " + costStr;
+    }
+
+    // Context window segment — tampilkan percentage
+    if (ctxPercent > 0) {
+      const ctxColor = ctxPercent > 80 ? C.bRed : ctxPercent > 60 ? C.bYellow : C.dim;
+      statusLine += " " + C.gray("\u2502") + " " + ctxColor("ctx " + ctxPercent + "%");
+    }
+
+    statusLine += " " + C.gray("\u2502") + " " + C.dim(provider);
     const hint = C.dim("/help");
     const hintPad = Math.max(1, W - visibleLen(statusLine) - visibleLen(hint) - 1);
     lines.push(statusLine + " ".repeat(hintPad) + hint);
@@ -900,14 +920,16 @@ export async function startTUI(config) {
             render();
           }
         },
-        onCost: (costInfo) => {
-          if (costInfo) {
-            thinkingText = costInfo.totalTokens + " tokens \u00B7 " + costInfo.costFormatted;
+        onCost: (info) => {
+          if (info) {
+            costInfo = info;
             render();
           }
         },
         onSummarize: (text) => {
           addMessage({ role: "assistant", content: "[Context] " + text });
+          // Context diringkas = reset percentage ke rendah
+          ctxPercent = Math.max(5, Math.round(ctxPercent * 0.3));
           render();
         },
       });
@@ -916,6 +938,14 @@ export async function startTUI(config) {
       addMessage({ role: "assistant", content: responseContent });
       status = "ready";
       thinkingText = "";
+      // Update context window percentage berdasarkan total messages
+      const totalEstTokens = estimateMessageTokens(messages);
+      ctxPercent = Math.min(100, Math.round((totalEstTokens / 128000) * 100));
+      // Update cost info dari result
+      if (result.cost) {
+        const { getCostSummary } = await import("../agent/cost.mjs");
+        costInfo = getCostSummary(result.cost);
+      }
       stopSpinner();
       // Start typing animation
       startTyping(responseContent, msgIdx);

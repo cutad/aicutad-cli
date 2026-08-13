@@ -148,9 +148,11 @@ export async function runCliAgent(task, opts = {}) {
   console.log();
   console.log("  " + pc.bold(pc.cyan("aicutad-cli")) + " " + pc.dim("selesai \u00B7 " + result.iterations + " iterasi \u00B7 " + result.toolCalls + " tools \u00B7 " + elapsed));
   if (result.costSummary) {
-    console.log("  " + pc.dim("cost: " + result.costSummary));
+    console.log("  " + pc.dim("\u2501".repeat(60)));
+    console.log("  " + pc.bold("Cost & Usage:"));
+    console.log("    " + pc.dim(result.costSummary));
+    console.log();
   }
-  console.log();
 
   if (result.result) {
     // Print result with simple markdown rendering
