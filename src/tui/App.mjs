@@ -296,9 +296,16 @@ export async function startTUI(config) {
 
   function startSpinner() {
     if (spinnerTimer) return;
+    // Full render sekali untuk setup layout, lalu in-place updates
+    render();
+    startSpinnerNoRender();
+  }
+
+  function startSpinnerNoRender() {
+    if (spinnerTimer) return;
     spinnerTimer = setInterval(() => {
       spinnerIdx = (spinnerIdx + 1) % SPINNER.length;
-      render(); // debounced render — single-write frame, no flicker
+      updateSpinnerInPlace();
     }, 100);
   }
 
@@ -315,6 +322,28 @@ export async function startTUI(config) {
 
   function stopClock() {
     if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
+  }
+
+  // ── In-place input update (no full redraw) ──────────────────
+  // Saat user mengetik/backspace, hanya update baris input.
+  // Tidak redraw seluruh screen = zero glitch.
+  function updateInputInPlace() {
+    const W = stdout.columns || 80;
+    const { inputRow } = layoutInfo;
+    if (inputRow < 1) { render(); return; } // fallback jika layout belum siap
+
+    const prompt = " " + C.bold(C.cyan("you \u203A")) + " ";
+    const maxInput = W - prompt.length - 1;
+    const inputDisplay = input.length > maxInput ? input.slice(input.length - maxInput) : input;
+
+    // Clear input line, write new content, position cursor
+    stdout.write("\x1b[" + inputRow + ";1H\x1b[2K" + prompt + inputDisplay + " ");
+    // Position cursor at end of input
+    const cursorCol = prompt.length + inputDisplay.length + 1;
+    stdout.write("\x1b[" + inputRow + ";" + cursorCol + "H");
+
+    // Update layoutInfo untuk cursor position
+    layoutInfo.inputCol = cursorCol;
   }
 
   // ── In-place spinner update (no full redraw) ───────────────
@@ -394,13 +423,10 @@ export async function startTUI(config) {
   }
 
   // ── In-place typing update (no full redraw) ────────────────
-  // For typing animation, we need to redraw the assistant message area.
-  // But ONLY the assistant message, not the whole screen.
-  // We do a targeted redraw of the message region.
   function updateTypingInPlace() {
     if (!typingActive || typingMsgIdx < 0) return;
-    // For typing, a full render is needed because message lines change
-    // But we use the debounced render which batches to 1 per microtask
+    // Redraw hanya message area — butuh full render karena content berubah
+    // Tapi pakai debounce, jadi maksimal 1 render per microtask
     render();
   }
 
@@ -904,8 +930,9 @@ export async function startTUI(config) {
     iterCount = 0;
     thinkingText = "";
     startTime = Date.now();
-    render(); // render before spinner starts
-    startSpinner();
+    render(); // single full render before spinner starts
+    // startSpinner will NOT call render() again — layout already set up
+    startSpinnerNoRender();
 
     const { runAgentLoop } = await import("../agent/loop.mjs");
     try {
@@ -929,8 +956,11 @@ export async function startTUI(config) {
         },
         onThinking: (content) => {
           if (content && content.trim()) {
-            thinkingText = content.trim().slice(0, 80);
-            render();
+            const newText = content.trim().slice(0, 80);
+            if (newText !== thinkingText) {
+              thinkingText = newText;
+              updateSpinnerInPlace();
+            }
           }
         },
         onCost: (info) => {
@@ -1119,7 +1149,7 @@ export async function startTUI(config) {
           // No backspace in model picker
         } else {
           input = input.slice(0, -1);
-          render();
+          updateInputInPlace();
         }
         i += 1;
         continue;
@@ -1134,7 +1164,7 @@ export async function startTUI(config) {
           // Model picker: ignore printable chars (use arrows + enter)
         } else {
           input += ch;
-          render();
+          updateInputInPlace();
         }
         i += 1;
         continue;
@@ -1148,10 +1178,16 @@ export async function startTUI(config) {
   // ── History navigation ─────────────────────────────────────
   function handleHistoryUp() {
     if (modal) {
-      // In model picker: navigate up
       if (modal.type === "models" && modal.state === "ready") {
         if (modal.selected > 0) modal.selected--;
         render();
+      } else if (modal.type === "help" || modal.type === "agents" || modal.type === "sessions") {
+        // Scrollable info modals
+        if (!modal.scroll) modal.scroll = 0;
+        if (modal.scroll < (modal.maxScroll || 0)) {
+          modal.scroll++;
+          render();
+        }
       }
       return;
     }
@@ -1174,10 +1210,15 @@ export async function startTUI(config) {
 
   function handleHistoryDown() {
     if (modal) {
-      // In model picker: navigate down
       if (modal.type === "models" && modal.state === "ready") {
         if (modal.selected < modal.items.length - 1) modal.selected++;
         render();
+      } else if (modal.type === "help" || modal.type === "agents" || modal.type === "sessions") {
+        // Scrollable info modals
+        if ((modal.scroll || 0) > 0) {
+          modal.scroll--;
+          render();
+        }
       }
       return;
     }
