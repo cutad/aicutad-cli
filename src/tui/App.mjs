@@ -154,7 +154,7 @@ async function bootSequence(stdout, W, H) {
   await sleep(150);
 
   // Version badge
-  const verText = "v0.4.0";
+  const verText = "v0.4.6";
   const verCol = winX + Math.floor((winW - verText.length) / 2);
   stdout.write(A.move(logoRow + 2, verCol) + C.gray(verText));
   await sleep(200);
@@ -459,7 +459,7 @@ export async function startTUI(config) {
                   String(now.getMinutes()).padStart(2, "0") + ":" +
                   String(now.getSeconds()).padStart(2, "0");
     const headerLeft = " " + C.bold(C.cyan("aicutad-cli")) +
-                       " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray("v0.4.2");
+                       " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray("v0.4.6");
     const headerRight = C.dim(clock);
     const headerPad = Math.max(1, W - visibleLen(headerLeft) - visibleLen(headerRight) - 1);
     lines.push(headerLeft + " ".repeat(headerPad) + headerRight);
@@ -546,15 +546,17 @@ export async function startTUI(config) {
     const inputDisplay = input.length > maxInput ? input.slice(input.length - maxInput) : input;
     lines.push(prompt + inputDisplay + " ");
 
-    // ── Build single-write frame ──
-    let frame = A.home;
+    // ── Build single-write frame with ABSOLUTE positioning ──
+    // NO \n — \n after last line causes terminal scroll = glitch/double.
+    // Use \x1b[R;1H to position each line absolutely.
+    let frame = "";
     for (let i = 0; i < lines.length; i++) {
-      frame += lines[i] + A.clearEOL + "\n";
+      frame += "\x1b[" + (i + 1) + ";1H" + lines[i] + A.clearEOL;
     }
-    // Clear leftover from previous frame
+    // Clear leftover lines from previous frame
     if (prevLineCount > lines.length) {
       for (let i = lines.length; i < prevLineCount; i++) {
-        frame += A.clearEOL + "\n";
+        frame += "\x1b[" + (i + 1) + ";1H" + A.clearEOL;
       }
     }
     prevLineCount = lines.length;
