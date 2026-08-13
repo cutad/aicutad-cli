@@ -791,11 +791,16 @@ export async function startTUI(config) {
 
     if (m.type === "help") {
       title = "Bantuan";
-      for (const [name, desc] of COMMANDS) {
-        modalLines.push("  " + C.cyan(name.padEnd(22)) + " " + C.gray(desc));
+      for (let i = 0; i < COMMANDS.length; i++) {
+        const [name, desc] = COMMANDS[i];
+        const isSelected = i === (m.selected || 0);
+        const marker = isSelected ? C.teal("\u25B8 ") : "  ";
+        const nameStr = isSelected ? C.bold(C.teal(name.padEnd(22))) : C.cyan(name.padEnd(22));
+        const descStr = isSelected ? C.white(desc) : C.gray(desc);
+        modalLines.push(marker + nameStr + " " + descStr);
       }
       modalLines.push("");
-      modalLines.push("  " + C.gray("Esc untuk tutup"));
+      modalLines.push("  " + C.gray("\u2191\u2193 navigasi  Enter pilih  Esc tutup"));
     } else if (m.type === "models") {
       title = "Pilih Model";
       if (m.state === "loading") {
@@ -871,7 +876,10 @@ export async function startTUI(config) {
   }
 
   // ── Modal helpers ──────────────────────────────────────────
-  function openHelp() { modal = { type: "help" }; render(); }
+  function openHelp() {
+    modal = { type: "help", selected: 0, items: COMMANDS.map(c => c[0]) };
+    render();
+  }
   function openSessions() {
     const sessions = listSessions();
     modal = { type: "sessions", items: sessions };
@@ -1127,6 +1135,42 @@ export async function startTUI(config) {
 
       // Enter
       if (ch === "\r" || ch === "\n") {
+        // Modal Enter — handle per modal type
+        if (modal) {
+          if (modal.type === "help") {
+            // Eksekusi command yang dipilih
+            const cmd = COMMANDS[modal.selected || 0];
+            if (cmd) {
+              const cmdText = cmd[0];
+              closeModal();
+              // /model <name> → buka model picker, /model saja juga buka picker
+              if (cmdText.startsWith("/model ") || cmdText === "/model <name>") {
+                openModels();
+              } else if (cmdText === "/exit" || cmdText === "/quit") {
+                cleanup();
+                process.exit(0);
+                return;
+              } else {
+                handleSubmit(cmdText).catch(() => {});
+              }
+            }
+          } else if (modal.type === "models" && modal.state === "ready") {
+            // Pilih model
+            const item = modal.items[modal.selected];
+            if (item) {
+              model = item.id || String(item);
+              closeModal();
+              addMessage({ role: "assistant", content: "Model diganti ke " + model });
+              render();
+            }
+          } else {
+            // Other modals: Enter closes
+            closeModal();
+          }
+          i += 1;
+          continue;
+        }
+
         const text = input;
         input = "";
         historyIdx = -1;
@@ -1157,11 +1201,11 @@ export async function startTUI(config) {
 
       // Printable characters
       if (ch >= " ") {
-        if (modal && (modal.type === "help" || modal.type === "sessions" || modal.type === "agents")) {
-          // Any key closes info modals
+        if (modal && (modal.type === "help" || modal.type === "models")) {
+          // Help & model picker: ignore printable chars (use arrows + enter + esc)
+        } else if (modal && (modal.type === "sessions" || modal.type === "agents")) {
+          // Sessions & agents: any key closes
           closeModal();
-        } else if (modal && modal.type === "models") {
-          // Model picker: ignore printable chars (use arrows + enter)
         } else {
           input += ch;
           updateInputInPlace();
@@ -1178,16 +1222,12 @@ export async function startTUI(config) {
   // ── History navigation ─────────────────────────────────────
   function handleHistoryUp() {
     if (modal) {
-      if (modal.type === "models" && modal.state === "ready") {
+      if ((modal.type === "models" && modal.state === "ready") || modal.type === "help") {
         if (modal.selected > 0) modal.selected--;
         render();
-      } else if (modal.type === "help" || modal.type === "agents" || modal.type === "sessions") {
-        // Scrollable info modals
+      } else if (modal.type === "agents" || modal.type === "sessions") {
         if (!modal.scroll) modal.scroll = 0;
-        if (modal.scroll < (modal.maxScroll || 0)) {
-          modal.scroll++;
-          render();
-        }
+        if (modal.scroll < (modal.maxScroll || 0)) { modal.scroll++; render(); }
       }
       return;
     }
@@ -1210,24 +1250,18 @@ export async function startTUI(config) {
 
   function handleHistoryDown() {
     if (modal) {
-      if (modal.type === "models" && modal.state === "ready") {
-        if (modal.selected < modal.items.length - 1) modal.selected++;
+      if ((modal.type === "models" && modal.state === "ready") || modal.type === "help") {
+        const max = modal.type === "help" ? COMMANDS.length - 1 : (modal.items.length - 1);
+        if (modal.selected < max) modal.selected++;
         render();
-      } else if (modal.type === "help" || modal.type === "agents" || modal.type === "sessions") {
-        // Scrollable info modals
-        if ((modal.scroll || 0) > 0) {
-          modal.scroll--;
-          render();
-        }
+      } else if (modal.type === "agents" || modal.type === "sessions") {
+        if ((modal.scroll || 0) > 0) { modal.scroll--; render(); }
       }
       return;
     }
     // If input is empty, scroll messages down
     if (input.length === 0 && !loading) {
-      if (scrollOffset > 0) {
-        scrollOffset--;
-        render();
-      }
+      if (scrollOffset > 0) { scrollOffset--; render(); }
       return;
     }
     // Input history
