@@ -184,8 +184,8 @@ export async function startTUI(config) {
     if (spinnerTimer) return;
     spinnerTimer = setInterval(() => {
       spinnerIdx = (spinnerIdx + 1) % SPINNER.length;
-      updateSpinnerInPlace();
-    }, 80);
+      render(); // debounced render — single-write frame, no flicker
+    }, 100);
   }
 
   function stopSpinner() {
@@ -206,6 +206,8 @@ export async function startTUI(config) {
   // ── In-place spinner update (no full redraw) ───────────────
   function updateSpinnerInPlace() {
     if (!loading) return;
+    // Jangan update in-place jika ada render queued — biarkan full render yang handle
+    if (renderQueued) return;
     const { spinnerRow, inputRow, inputCol } = layoutInfo;
     if (spinnerRow < 1) return;
 
@@ -340,6 +342,8 @@ export async function startTUI(config) {
     }
 
     // ── Spinner / loading indicator ──
+    // Simpan baris spinner untuk updateSpinnerInPlace
+    const spinnerLineIdx = lines.length; // next line will be spinner (or padding)
     if (loading) {
       const frame = SPINNER[spinnerIdx];
       let statusText = "menunggu respons";
@@ -381,7 +385,7 @@ export async function startTUI(config) {
     const prompt = " " + C.bold(C.cyan("you \u203A")) + " ";
     const maxInput = W - prompt.length - 1;
     const inputDisplay = input.length > maxInput ? input.slice(input.length - maxInput) : input;
-    lines.push(prompt + inputDisplay + C.gray("\u258E"));
+    lines.push(prompt + inputDisplay + " ");
 
     // ── Build single-write frame ──
     let frame = A.home;
@@ -406,8 +410,8 @@ export async function startTUI(config) {
     const promptStr = " " + C.bold(C.cyan("you \u203A")) + " ";
     const inputDisp = input.length > (W - promptStr.length - 1) ? input.slice(input.length - (W - promptStr.length - 1)) : input;
     layoutInfo.inputCol = promptStr.length + inputDisp.length + 1;
-    // Spinner row = last padding line before separator (the line we overwrite during loading)
-    layoutInfo.spinnerRow = lines.length - footerH; // last message area line
+    // Spinner row = the line where spinner is written (last message area line, 1-indexed)
+    layoutInfo.spinnerRow = lines.length - footerH; // same as where spinner is written in lines[]
     // Status row = second to last line
     layoutInfo.statusRow = lines.length - 1;
 
@@ -756,7 +760,7 @@ export async function startTUI(config) {
     iterCount = 0;
     thinkingText = "";
     startTime = Date.now();
-    render(); // render BEFORE startSpinner so layoutInfo is set
+    render(); // render before spinner starts
     startSpinner();
 
     const { runAgentLoop } = await import("../agent/loop.mjs");
@@ -932,7 +936,8 @@ export async function startTUI(config) {
         const text = input;
         input = "";
         historyIdx = -1;
-        render();
+        // JANGAN render() di sini — handleSubmit akan render sendiri.
+        // Render di sini bikin "berpikir" muncul 2x (render ini + render di handleSubmit).
         handleSubmit(text).catch((e) => {
           addMessage({ role: "assistant", content: "Error: " + e.message });
           loading = false;
