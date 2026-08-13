@@ -271,6 +271,7 @@ export async function startTUI(config) {
   let inputHistory = [];
   let historyIdx = -1;
   let typingActive = false;
+  let scrollOffset = 0;  // scroll up/down messages (0 = bottom/latest)
   let typingContent = "";
   let typingPos = 0;
   let typingMsgIdx = -1;
@@ -432,7 +433,7 @@ export async function startTUI(config) {
                   String(now.getMinutes()).padStart(2, "0") + ":" +
                   String(now.getSeconds()).padStart(2, "0");
     const headerLeft = " " + C.bold(C.cyan("aicutad-cli")) +
-                       " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray("v0.4.0");
+                       " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray("v0.4.2");
     const headerRight = C.dim(clock);
     const headerPad = Math.max(1, W - visibleLen(headerLeft) - visibleLen(headerRight) - 1);
     lines.push(headerLeft + " ".repeat(headerPad) + headerRight);
@@ -443,8 +444,12 @@ export async function startTUI(config) {
     const msgAreaH = H - 2 - footerH;
     const msgLines = buildMessageLines(W);
 
-    // Scroll: show last msgAreaH lines (or more if scrollOffset)
-    const visible = msgLines.slice(-msgAreaH);
+    // Scroll: show last msgAreaH lines, adjusted by scrollOffset
+    const totalMsgLines = msgLines.length;
+    const maxOffset = Math.max(0, totalMsgLines - msgAreaH);
+    const effectiveOffset = Math.min(scrollOffset, maxOffset);
+    const startIdx = Math.max(0, totalMsgLines - msgAreaH - effectiveOffset);
+    const visible = msgLines.slice(startIdx, startIdx + msgAreaH);
     for (const line of visible) {
       lines.push(line);
     }
@@ -482,7 +487,7 @@ export async function startTUI(config) {
 
     // ── Status bar ──
     const sIcon = loading ? C.bYellow("\u25CF") : status === "error" ? C.bRed("\u25CF") : C.bGreen("\u25CF");
-    const sLabel = loading ? C.bYellow("bekerja") : status === "error" ? C.bRed("error") : C.bGreen("ready");
+    const sLabel = loading ? C.bYellow("bekerja") : status === "error" ? C.bRed("error") : (scrollOffset > 0 ? C.bBlue("scroll " + scrollOffset) : C.bGreen("ready"));
     const msgCount = messages.length + " pesan";
     const provider = config.provider || "cutad";
     const maxModelLen = W - 52;
@@ -565,7 +570,7 @@ export async function startTUI(config) {
       out.push("");
       out.push("   " + C.gray("Tulis tugas atau pertanyaan, lalu tekan Enter"));
       out.push("   " + C.dim("Contoh:") + " " + C.cyan("\"buat file hello.js\"") + "  " + C.gray("\u00B7") + "  " + C.dim("/help untuk bantuan"));
-      out.push("   " + C.gray("\u2191\u2193 history  Tab complete  Ctrl+L clear  Ctrl+S save"));
+      out.push("   " + C.gray("\u2191\u2193 scroll/history  Tab complete  Ctrl+L clear  Ctrl+S save"));
       out.push("");
       return out;
     }
@@ -764,7 +769,7 @@ export async function startTUI(config) {
         modalLines.push("  " + C.cyan(name.padEnd(22)) + " " + C.gray(desc));
       }
       modalLines.push("");
-      modalLines.push("  " + C.gray("\u2191\u2193 history  Tab complete  Ctrl+L clear  Ctrl+S save"));
+      modalLines.push("  " + C.gray("Esc untuk tutup"));
     } else if (m.type === "models") {
       title = "Pilih Model";
       if (m.state === "loading") {
@@ -816,6 +821,10 @@ export async function startTUI(config) {
     const modalY = Math.floor((H - modalH) / 2);
 
     let frame = "";
+    // Clear the modal area first to prevent glitch/bleed-through
+    for (let r = modalY; r < modalY + modalH; r++) {
+      frame += A.move(r, modalX) + " ".repeat(modalW);
+    }
     // Top border
     frame += A.move(modalY, modalX) + C.gray("\u256D" + "\u2500".repeat(modalW - 2) + "\u256E");
     // Title
@@ -885,6 +894,8 @@ export async function startTUI(config) {
 
     input = "";
     addMessage({ role: "user", content: trimmed });
+    // Reset scroll to bottom
+    scrollOffset = 0;
     // Update context window percentage berdasarkan semua messages
     ctxPercent = Math.min(100, Math.round((estimateMessageTokens(messages) / 128000) * 100));
     loading = true;
@@ -1144,6 +1155,12 @@ export async function startTUI(config) {
       }
       return;
     }
+    // If input is empty, scroll messages up instead of history
+    if (input.length === 0 && !loading) {
+      scrollOffset++;
+      render();
+      return;
+    }
     // Input history
     if (inputHistory.length === 0) return;
     if (historyIdx === -1) {
@@ -1160,6 +1177,14 @@ export async function startTUI(config) {
       // In model picker: navigate down
       if (modal.type === "models" && modal.state === "ready") {
         if (modal.selected < modal.items.length - 1) modal.selected++;
+        render();
+      }
+      return;
+    }
+    // If input is empty, scroll messages down
+    if (input.length === 0 && !loading) {
+      if (scrollOffset > 0) {
+        scrollOffset--;
         render();
       }
       return;
