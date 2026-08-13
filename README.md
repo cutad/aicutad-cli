@@ -1,15 +1,16 @@
 <div align="center">
 
-# AI CUTAD CLI
+# ◆ aicutad-cli
 
-**AI Coding Agent CLI** — baca, tulis, edit file & jalankan command otonom lewat terminal.
+**AI Coding Agent CLI** — baca, tulis, edit file & jalankan command shell otonom lewat terminal.
 
 Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatible `/v1`
 
-[![Version](https://img.shields.io/badge/version-0.3.0-cyan)]()
+[![Version](https://img.shields.io/badge/version-0.4.0-cyan)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-green)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-orange)]()
+[![Deps](https://img.shields.io/badge/dependencies-3-teal)]()
 
 </div>
 
@@ -17,23 +18,31 @@ Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatibl
 
 ## Apa itu?
 
-**AI CUTAD** adalah agent coding yang jalan di terminal kamu. Bukan sekadar chat — ia **baca file, tulis kode, edit file, dan jalankan command shell sendiri** lewat agentic loop dengan function calling.
+**aicutad-cli** adalah AI coding agent yang jalan di terminal kamu. Bukan sekadar chat — ia **baca file, tulis kode, edit file, dan jalankan command shell sendiri** lewat agentic loop dengan function calling.
 
 Kamu kasih tugas, agent bekerja otonom: baca → tulis → verifikasi → lapor.
 
 ```
 $ aicutad agent "buat file hello.js berisi console.log hello world"
 
-⚡ tool  write_file(hello.js, 42 bytes)
-✓ result (1 baris)
-⚡ tool  read_file(hello.js)
-✓ result (2 baris)
-⚡ tool  run_command(node hello.js)
-✓ result (2 baris)
+  ◆ aicutad-cli agent mode · v0.4.0
+  model: deepseek-ai/deepseek-v4-pro  dir: /root/project
+  ────────────────────────────────────────────────────────────
+  › buat file hello.js berisi console.log hello world
+  ────────────────────────────────────────────────────────────
 
-AI CUTAD selesai · 4 iterasi · 4 tool calls
+  ⠋ berpikir…
+  📝 Write (hello.js, 42 bytes)
+  📝 Write ✓ (1 baris)
+  📖 Read (hello.js)
+  📖 Read ✓ (2 baris)
+  ⚡ Run (node hello.js)
+  ⚡ Run ✓ (2 baris)
 
-File hello.js berhasil dibuat & diverifikasi. Output: "Hello, World!"
+  ────────────────────────────────────────────────────────────
+  ◆ aicutad-cli selesai · 4 iterasi · 3 tools · 1.2s
+
+  File hello.js berhasil dibuat & diverifikasi. Output: "Hello, World!"
 ```
 
 ## Instalasi
@@ -45,7 +54,7 @@ npm install -g aicutad-cli
 Atau dari source:
 
 ```bash
-git clone https://github.com/rudiansyah1998/aicutad-cli.git
+git clone https://github.com/cutad/aicutad-cli.git
 cd aicutad-cli
 npm install -g .
 ```
@@ -58,13 +67,14 @@ npm install -g .
 aicutad
 ```
 
-Pertama kali jalankan, **setup wizard** muncul otomatis:
+Pertama kali jalankan, **setup wizard premium** muncul otomatis:
 
-1. **Masukkan API key** (input tersembunyi `••••••••`)
-2. **Validasi koneksi** ke gateway (animated spinner)
-3. **Pilih model** (arrow-key ↑/↓ selector)
-4. **Simpan konfigurasi** ke `~/.cutad/auth.json`
-5. **Langsung masuk TUI** full-screen
+1. **Boot animation** — bordered window, typewriter logo, system info
+2. **Masukkan API key** (input tersembunyi `••••••••`)
+3. **Validasi koneksi** ke gateway (animated spinner)
+4. **Pilih model** (arrow-key ↑/↓ selector, clean UI)
+5. **Simpan konfigurasi** ke `~/.cutad/auth.json`
+6. **Langsung masuk TUI** full-screen immersive
 
 Setelah setup, `aicutad` langsung buka **TUI agent** — ketik tugas apa pun, agent kerjakan.
 
@@ -86,8 +96,8 @@ Setiap pesan di TUI = **agent**. Model selalu punya akses ke 6 tools:
 ```
 User: "buat file fibonacci.js"
   → Model: write_file(fibonacci.js, ...)
-  → Model: read_file(fibonacci.js)     // verifikasi
-  → Model: run_command(node fibonacci.js)  // test
+  → Model: read_file(fibonacci.js)          // verifikasi
+  → Model: run_command(node fibonacci.js)   // test
   → Model: lapor hasil ke user
 ```
 
@@ -96,49 +106,63 @@ Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. 
 ## TUI Full-Screen
 
 ```
- ◆ AI CUTAD │ AI Coding Agent CLI v0.3.0
- ──────────────────────────────────────────────────────────────────
- ┌─ you
+ ◆ aicutad-cli │ AI Coding Agent CLI v0.4.0          19:20:35
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ┌─ you 19:20
  │ ada apa di sini
  └─
- ┌─ 📂 List Files /tmp/project
- └─ menunggu eksekusi...
- ┌─ 📂 List Files selesai
- │ file  hello.js
- │ file  utils.js
- └─
- ┌─ 📖 Read File /tmp/project/hello.js
- └─ menunggu eksekusi...
- ┌─ 📖 Read File selesai
- │ console.log('Hello, World!')
- └─
- ┌─ AI CUTAD
+ 📂 List /tmp/project …
+ 📂 List ✓ file hello.js, file utils.js
+ 📖 Read /tmp/project/hello.js …
+ 📖 Read ✓ console.log('Hello, World!')
+ ┌─ aicutad-cli 19:20
  │ Di direktori ada 2 file: hello.js dan utils.js.
  │ hello.js berisi console.log('Hello, World!').
  │ Mau aku apain?
  └─
- ──────────────────────────────────────────────────────────────────
- ● │ ready │ muse-spark-1.2-contributor │ 6 pesan │ cutad
- you › ▎
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ● │ ready │ deepseek-ai/deepseek-v4-pro │ 6 pesan │ cutad   /help
+ you ›
 ```
 
-**Fitur TUI:**
-- Animated spinner (10-frame, 80ms) — halus tanpa flicker
-- Tool boxes berwarna dengan icon per tool
-- User messages: cyan border · AI responses: green border
-- Status bar dengan colored indicator (🟢 ready · 🟡 bekerja · 🔴 error)
-- Real-time tool count & iteration counter
-- Alternate screen buffer (terminal asli tidak rusak)
+### Fitur TUI v0.4.0
 
-**Command di TUI:**
+- **Boot animation premium** — bordered window, typewriter logo, multi-step progress
+- **Full-screen immersive** — alternate buffer, fokus hanya ke aicutad-cli
+- **Glitch-free rendering** — debounced single-write frame, in-place clock update
+- **Typing animation** — AI response muncul char-by-char
+- **Interactive model picker** — arrow keys, modal overlay
+- **Input history** — ↑/↓ arrows recall pesan sebelumnya
+- **Keyboard shortcuts** — `Ctrl+L` clear, `Ctrl+S` save, `Tab` autocomplete
+- **Modal overlays** — help, models, sessions, agents (centered bordered)
+- **Live clock** — `HH:MM:SS` di header
+- **Markdown rendering** — code blocks, bold, italic, headers, lists, blockquotes
+- **Message timestamps** — `HH:MM` per message
+- **Compact tool display** — inline 1-baris dengan icon + color + status
+- **Status bar** — colored indicator (🟢 ready · 🟡 bekerja · 🔴 error)
+- **Spinner animation** — braille dots, 100ms smooth
+
+### Keyboard Shortcuts
+
+| Key | Fungsi |
+|---|---|
+| `↑` / `↓` | History navigasi / model picker scroll |
+| `Tab` | Autocomplete command |
+| `Ctrl+L` | Clear screen |
+| `Ctrl+S` | Save session |
+| `Ctrl+C` | Keluar |
+| `Esc` | Tutup modal |
+| `Enter` | Kirim pesan |
+
+### Command di TUI
 
 | Command | Fungsi |
 |---|---|
-| `/help` | Tampilkan daftar perintah |
-| `/models` | Daftar model dari gateway |
-| `/model <name>` | Ganti model aktif |
-| `/agents` | Daftar subagent tersedia |
-| `/sessions` | Daftar session tersimpan |
+| `/help` | Tampilkan bantuan (modal overlay) |
+| `/models` | Pilih model (interactive modal picker) |
+| `/model <name>` | Ganti model langsung |
+| `/agents` | Daftar subagent (modal overlay) |
+| `/sessions` | Daftar session tersimpan (modal overlay) |
 | `/save` | Simpan session |
 | `/clear` | Bersihkan layar |
 | `/exit` | Keluar |
@@ -156,12 +180,16 @@ aicutad
 # Chat satu kali
 aicutad chat "jelaskan apa itu closure"
 
+# Chat interaktif (REPL)
+aicutad chat
+
 # Manajemen
-aicutad login      # setup wizard
-aicutad status     # cek status login
-aicutad models     # daftar model
+aicutad login      # setup wizard premium
+aicutad status     # cek status login + jumlah model
+aicutad models     # daftar model dari gateway
 aicutad agents     # daftar subagent
 aicutad sessions   # daftar session tersimpan
+aicutad mcp --list # daftar MCP server
 aicutad logout     # hapus kredensial
 ```
 
@@ -190,9 +218,33 @@ aicutad sessions          # daftar semua session
 
 Di TUI: `/save` untuk simpan manual, `/sessions` untuk lihat daftar.
 
+## MCP Support
+
+aicutad-cli mendukung [Model Context Protocol](https://modelcontextprotocol.io) untuk extend tools:
+
+```bash
+aicutad mcp --list                    # daftar MCP server
+aicutad mcp --add <name>              # tambah MCP server
+aicutad mcp --connect <name>          # connect & list tools
+aicutad mcp --remove <name>           # hapus MCP server
+```
+
+Config MCP disimpan di `~/.cutad/mcp.json`.
+
 ## Konfigurasi
 
-Disimpan di `~/.cutad/auth.json`:
+Disimpan di `~/.cutad/`:
+
+```
+~/.cutad/
+├── auth.json         # API key, model, gateway
+├── sessions/         # riwayat percakapan
+├── providers.json    # multi-gateway config
+├── mcp.json          # MCP server config
+└── plugins.json      # plugin config
+```
+
+**auth.json:**
 
 ```json
 {
@@ -221,14 +273,14 @@ CUTAD_API_KEY=cag_... CUTAD_MODEL=deepseek-ai/deepseek-v4-pro aicutad login
 ```
 aicutad-cli/
 ├── bin/
-│   └── cutad.mjs              # entrypoint (Commander)
+│   └── cutad.mjs              # entrypoint (Commander, 8 subcommands)
 ├── src/
 │   ├── tui/
-│   │   └── App.mjs            # TUI native full-screen (ANSI)
+│   │   └── App.mjs            # TUI native full-screen (ANSI, v0.4.0)
 │   ├── agent/
 │   │   ├── tools.mjs          # 6 tool definitions (function calling)
 │   │   ├── executor.mjs       # eksekusi tool (read/write/edit/run)
-│   │   ├── loop.mjs           # agentic loop (model ↔ tool)
+│   │   ├── loop.mjs           # agentic loop (model ↔ tool, max 20 iter)
 │   │   ├── run.mjs            # CLI entrypoint agent mode
 │   │   └── index.mjs          # 8 subagent + delegate parallel/chain
 │   ├── session/
@@ -241,12 +293,15 @@ aicutad-cli/
 │   │   └── index.mjs          # load external modules
 │   ├── api.mjs                # gateway komunikasi (models + chat)
 │   ├── chat.mjs               # REPL + TUI launcher
-│   ├── commands.mjs           # login wizard / status / logout
+│   ├── commands.mjs           # login wizard premium / status / logout
 │   ├── config.mjs             # baca/tulis auth
 │   ├── constants.mjs          # URL & konstanta
 │   ├── models.mjs             # daftar model
-│   ├── prompt.mjs             # masked input + arrow selector
+│   ├── prompt.mjs             # masked input + arrow selector (glitch-free)
 │   └── ui.mjs                 # UI toolkit (banner, panel, spinner)
+├── .github/workflows/
+│   ├── ci.yml                 # CI test (Node 18/20/22)
+│   └── publish.yml            # Auto-publish to npm on release
 ├── .gitignore
 ├── package.json
 └── README.md
@@ -258,22 +313,52 @@ aicutad-cli/
 - **Gateway:** ai.cutad.web.id (OpenAI-compatible `/v1`)
 - **Function calling:** OpenAI tools API (`tools` + `tool_choice: auto`)
 - **TUI:** Native ANSI control codes (no React/Ink dependency)
+- **Rendering:** Debounced single-write frame + in-place timer updates
 - **Dependencies:** `commander` (CLI), `picocolors` (color), `@modelcontextprotocol/sdk` (MCP)
+- **Package size:** 29.7 KB (3 deps only)
 
 ## Roadmap
 
-- [x] TUI full-screen dengan animated spinner & tool boxes
+### Done (v0.4.0)
+
+- [x] TUI full-screen immersive (alternate buffer)
+- [x] Boot animation premium (bordered window, typewriter, multi-step)
 - [x] Agentic loop dengan function calling (6 tools)
+- [x] Glitch-free rendering (debounced + in-place clock/spinner)
+- [x] Typing animation (AI response char-by-char)
+- [x] Interactive model picker (modal overlay, arrow keys)
+- [x] Input history (↑/↓ arrows)
+- [x] Keyboard shortcuts (Ctrl+L, Ctrl+S, Tab autocomplete)
+- [x] Modal overlays (help, models, sessions, agents)
+- [x] Live clock di header
+- [x] Markdown rendering (code blocks, bold, italic, headers, lists)
+- [x] Message timestamps
 - [x] Session management (save/load/list)
-- [x] 8 subagent bawaan + delegate parallel/chain
+- [x] 8 subagent + delegate parallel/chain
 - [x] MCP client support
 - [x] Multi-provider config
 - [x] Plugin system
-- [ ] Streaming response (SSE) di TUI
-- [ ] GitHub PR integration
+- [x] First-run wizard premium
+- [x] CI/CD (GitHub Actions)
+- [x] Login wizard dengan animated spinner & progress bar
+
+### Next Priority
+
+- [ ] **Publish to npm registry**
+- [ ] **Streaming response (SSE)** — TUI shows answer token-by-token
+- [ ] **GitHub PR integration** — auto create branch, commit, push, open PR
+
+### Future
+
 - [ ] Headless server + web interface
-- [ ] Publish ke npm registry
+- [ ] Diff viewer in TUI (show file changes before apply)
+- [ ] Context window management (summarize old messages)
+- [ ] Multi-file editing in single tool call
+- [ ] Voice input (TTS/STT integration)
+- [ ] Custom tool plugins (user-defined tools)
+- [ ] Model-specific routing (different models for different tasks)
+- [ ] Cost tracking (token usage per session)
 
 ## License
 
-MIT © [rudiansyah1998](https://github.com/rudiansyah1998)
+MIT © [cutad](https://github.com/cutad)
