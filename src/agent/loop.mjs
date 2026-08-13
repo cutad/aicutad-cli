@@ -92,9 +92,22 @@ export async function runAgentLoop({
     const callDuration = Date.now() - callStart;
     const choice = response?.choices?.[0];
 
-    // Cost tracking
+    // Cost tracking — jika gateway tidak return usage, estimasi dari messages
     if (response?.usage) {
       recordCall(costTracker, response.usage, model, callDuration);
+      onCost?.(getCostSummary(costTracker));
+    } else {
+      // Estimasi token dari request messages + response content
+      const { estimateMessageTokens } = await import("./context.mjs");
+      const estInput = estimateMessageTokens(messages);
+      const estOutput = assistantMessage?.content
+        ? Math.ceil(assistantMessage.content.length / 4)
+        : 0;
+      recordCall(costTracker, {
+        prompt_tokens: estInput,
+        completion_tokens: estOutput,
+        total_tokens: estInput + estOutput,
+      }, model, callDuration);
       onCost?.(getCostSummary(costTracker));
     }
 

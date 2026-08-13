@@ -492,14 +492,14 @@ export async function startTUI(config) {
     let statusLine = " " + sIcon + " " + C.gray("\u2502") + " " + sLabel + " " + C.gray("\u2502") +
                      " " + C.bold(modelDisplay) + " " + C.gray("\u2502") + " " + C.dim(msgCount);
 
-    // Cost segment — tampilkan tokens + biaya
+    // Cost segment — tampilkan tokens + biaya (selalu jika ada costInfo)
     if (costInfo) {
       const costStr = C.dim(formatTokens(costInfo.totalTokens) + " tok") + " " + C.gray("\u2502") + " " + C.dim(costInfo.costFormatted);
       statusLine += " " + C.gray("\u2502") + " " + costStr;
     }
 
-    // Context window segment — tampilkan percentage
-    if (ctxPercent > 0) {
+    // Context window segment — selalu tampilkan (ctx 0% saat awal)
+    {
       const ctxColor = ctxPercent > 80 ? C.bRed : ctxPercent > 60 ? C.bYellow : C.dim;
       statusLine += " " + C.gray("\u2502") + " " + ctxColor("ctx " + ctxPercent + "%");
     }
@@ -885,6 +885,8 @@ export async function startTUI(config) {
 
     input = "";
     addMessage({ role: "user", content: trimmed });
+    // Update context window percentage berdasarkan semua messages
+    ctxPercent = Math.min(100, Math.round((estimateMessageTokens(messages) / 128000) * 100));
     loading = true;
     status = "agent";
     toolCount = 0;
