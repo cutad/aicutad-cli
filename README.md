@@ -6,11 +6,13 @@
 
 Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatible `/v1`
 
-[![Version](https://img.shields.io/badge/version-0.4.6-cyan)]()
+[![Version](https://img.shields.io/badge/version-0.4.7-cyan)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-green)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-orange)]()
 [![Deps](https://img.shields.io/badge/dependencies-4-teal)]()
+
+<img src="docs/tui-demo.jpg" alt="aicutad-cli TUI Demo" width="720">
 
 </div>
 
