@@ -147,6 +147,9 @@ export async function runCliAgent(task, opts = {}) {
   console.log("  " + pc.dim("\u2501".repeat(60)));
   console.log();
   console.log("  " + pc.bold(pc.cyan("aicutad-cli")) + " " + pc.dim("selesai \u00B7 " + result.iterations + " iterasi \u00B7 " + result.toolCalls + " tools \u00B7 " + elapsed));
+  if (result.costSummary) {
+    console.log("  " + pc.dim("cost: " + result.costSummary));
+  }
   console.log();
 
   if (result.result) {
@@ -194,6 +197,12 @@ function formatArgs(name, args) {
       return "\"" + (args.pattern || "") + "\" in " + (args.path || ".");
     case "run_command":
       return (args.command || "").slice(0, 60) || "";
+    case "browse_page":
+      return args.url || "";
+    case "web_search":
+      return "\"" + (args.query || "") + "\"";
+    case "screenshot":
+      return (args.url || "") + (args.full_page ? " (full)" : "");
     default:
       return Object.keys(args).join(", ");
   }

@@ -66,6 +66,9 @@ const TOOL_STYLE = {
   list_files:   { icon: "\u{1F4C2}", color: C.cyan,   label: "List" },
   search_files: { icon: "\u{1F50D}", color: C.magenta, label: "Search" },
   run_command:  { icon: "\u26A1",  color: C.orange,  label: "Run" },
+  browse_page:  { icon: "\u{1F310}", color: C.blue,   label: "Browse" },
+  web_search:   { icon: "\u{1F50E}", color: C.cyan,   label: "Web" },
+  screenshot:   { icon: "\u{1F4F7}", color: C.magenta, label: "Shot" },
 };
 
 const COMMANDS = [
@@ -714,6 +717,9 @@ export async function startTUI(config) {
     if (name === "list_files") return args.path || ".";
     if (name === "search_files") return "\"" + (args.pattern || "") + "\"";
     if (name === "run_command") return (args.command || "").slice(0, 60);
+    if (name === "browse_page") return args.url || "";
+    if (name === "web_search") return "\"" + (args.query || "") + "\"";
+    if (name === "screenshot") return args.url || "";
     return Object.keys(args).join(", ");
   }
 
@@ -893,6 +899,16 @@ export async function startTUI(config) {
             thinkingText = content.trim().slice(0, 80);
             render();
           }
+        },
+        onCost: (costInfo) => {
+          if (costInfo) {
+            thinkingText = costInfo.totalTokens + " tokens \u00B7 " + costInfo.costFormatted;
+            render();
+          }
+        },
+        onSummarize: (text) => {
+          addMessage({ role: "assistant", content: "[Context] " + text });
+          render();
         },
       });
       const responseContent = result.result || "(selesai)";

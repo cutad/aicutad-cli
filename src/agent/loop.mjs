@@ -14,6 +14,9 @@ import path from "node:path";
 import os from "node:os";
 import { TOOLS } from "./tools.mjs";
 import { executeTool } from "./executor.mjs";
+import { needsSummarize, summarizeContext } from "./context.mjs";
+import { createCostTracker, recordCall, getCostSummary, formatCostSummary } from "./cost.mjs";
+import { closeBrowser } from "./browser.mjs";
 
 const MAX_ITERATIONS = 20;
 const AGENT_SYSTEM_PROMPT = `Kamu adalah aicutad-cli, agent coding otonom.
@@ -54,29 +57,52 @@ Aturan:
  */
 export async function runAgentLoop({
   baseUrl, apiKey, model, task, cwd,
-  onToolCall, onToolResult, onThinking, onError,
+  onToolCall, onToolResult, onThinking, onError, onCost, onSummarize,
 }) {
   const workDir = cwd || process.cwd();
   const messages = [
-    { role: "system", content: AGENT_SYSTEM_PROMPT + `\n\nWorking directory: ${workDir}\nOS: ${os.platform()} ${os.release()}` },
+    { role: "system", content: AGENT_SYSTEM_PROMPT + `\n\nWorking directory: ${workDir}\nOS: ${os.platform()} ${os.release()}\n\nKamu juga punya tools browser: browse_page (buka URL & baca teks), web_search (cari di Google), screenshot (ambil screenshot halaman).` },
     { role: "user", content: task },
   ];
 
   let iterations = 0;
   let toolCallCount = 0;
   let finalResult = "";
+  const costTracker = createCostTracker();
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
+    // Context window management — summarize jika terlalu panjang
+    if (needsSummarize(messages)) {
+      onSummarize?.("Meringkas percakapan...");
+      const before = messages.length;
+      const summarized = await summarizeContext(messages, { baseUrl, apiKey, model });
+      const after = summarized.length;
+      if (after < before) {
+        messages.length = 0;
+        messages.push(...summarized);
+        onSummarize?.(`Percakapan diringkas: ${before} → ${after} pesan`);
+      }
+    }
+
     // Kirim ke model dengan tools
+    const callStart = Date.now();
     const response = await callModelWithTools(baseUrl, apiKey, model, messages);
+    const callDuration = Date.now() - callStart;
     const choice = response?.choices?.[0];
+
+    // Cost tracking
+    if (response?.usage) {
+      recordCall(costTracker, response.usage, model, callDuration);
+      onCost?.(getCostSummary(costTracker));
+    }
 
     if (!choice) {
       const errMsg = "Model tidak memberikan respons.";
       onError?.(errMsg);
-      return { result: errMsg, iterations, toolCalls: toolCallCount };
+      await closeBrowser();
+      return { result: errMsg, iterations, toolCalls: toolCallCount, cost: costTracker };
     }
 
     const assistantMessage = choice.message;
@@ -89,14 +115,12 @@ export async function runAgentLoop({
 
     // Jika ada tool_calls → eksekusi & lanjut loop
     if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-      // Tambahkan pesan assistant (dengan tool_calls) ke history
       messages.push({
         role: "assistant",
         content: assistantMessage.content || null,
         tool_calls: assistantMessage.tool_calls,
       });
 
-      // Eksekusi setiap tool call
       for (const toolCall of assistantMessage.tool_calls) {
         toolCallCount++;
         const funcName = toolCall.function.name;
@@ -109,11 +133,10 @@ export async function runAgentLoop({
 
         onToolCall?.(funcName, args);
 
-        const result = executeTool(funcName, args, workDir);
+        const result = await executeTool(funcName, args, workDir);
 
         onToolResult?.(funcName, result);
 
-        // Tambahkan hasil tool ke history
         messages.push({
           role: "tool",
           tool_call_id: toolCall.id,
@@ -121,13 +144,11 @@ export async function runAgentLoop({
         });
       }
 
-      // Lanjut iterasi berikutnya (model akan lihat hasil tool)
       continue;
     }
 
     // Tidak ada tool_calls → model selesai
     if (choice.finish_reason === "stop" || !assistantMessage.tool_calls) {
-      // Edge case: model return kosong sama sekali
       if (!finalResult && !assistantMessage.content) {
         finalResult = "(Model tidak memberikan respons.)";
       }
@@ -139,7 +160,16 @@ export async function runAgentLoop({
     finalResult += "\n\n(Berhenti setelah 20 iterasi — batas aman.)";
   }
 
-  return { result: finalResult, iterations, toolCalls: toolCallCount };
+  // Cleanup browser
+  await closeBrowser();
+
+  return {
+    result: finalResult,
+    iterations,
+    toolCalls: toolCallCount,
+    cost: costTracker,
+    costSummary: formatCostSummary(costTracker),
+  };
 }
 
 /**

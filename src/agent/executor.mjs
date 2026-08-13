@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync, spawnSync } from "node:child_process";
+import { browsePage, searchWeb, screenshotPage } from "./browser.mjs";
 
 const MAX_OUTPUT = 50000; // batas output per tool
 
@@ -14,7 +15,7 @@ const MAX_OUTPUT = 50000; // batas output per tool
  * @param {string} cwd working directory
  * @returns {string} hasil eksekusi (string)
  */
-export function executeTool(name, args, cwd = process.cwd()) {
+export async function executeTool(name, args, cwd = process.cwd()) {
   try {
     switch (name) {
       case "read_file":
@@ -29,6 +30,12 @@ export function executeTool(name, args, cwd = process.cwd()) {
         return searchFiles(args.pattern, args.path || cwd, cwd);
       case "run_command":
         return runCommand(args.command, cwd);
+      case "browse_page":
+        return await browsePage(args.url, { wait: args.wait });
+      case "web_search":
+        return await searchWeb(args.query);
+      case "screenshot":
+        return await screenshotPage(args.url, { fullPage: args.full_page });
       default:
         return `Error: tool "${name}" tidak dikenal.`;
     }

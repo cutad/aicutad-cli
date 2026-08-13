@@ -92,6 +92,50 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "browse_page",
+      description: "Buka URL di headless browser (Chromium) dan ekstrak teks halaman. Berguna untuk baca dokumentasi, artikel, atau API response dari web.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL halaman yang ingin dibuka." },
+          wait: { type: "number", description: "Tunggu X ms setelah load untuk dynamic content (default: 0, max: 5000)." },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description: "Cari di Google menggunakan headless browser. Return 5 hasil teratas dengan judul, URL, dan snippet.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Query pencarian." },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "screenshot",
+      description: "Ambil screenshot halaman web. Simpan sebagai PNG file. Berguna untuk inspeksi visual.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL halaman yang ingin di-screenshot." },
+          full_page: { type: "boolean", description: "Screenshot full page (default: false, hanya viewport)." },
+        },
+        required: ["url"],
+      },
+    },
+  },
 ];
 
 /** Daftar nama tool. */

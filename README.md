@@ -90,6 +90,9 @@ Setiap pesan di TUI = **agent**. Model selalu punya akses ke 6 tools:
 | `list_files` | 📂 | Daftar file & direktori |
 | `search_files` | 🔍 | Cari teks (regex) di kode |
 | `run_command` | ⚡ | Jalankan command shell |
+| `browse_page` | 🌐 | Buka URL di headless Chromium & ekstrak teks |
+| `web_search` | 🔎 | Cari di Google, return 5 hasil teratas |
+| `screenshot` | 📷 | Screenshot halaman web (PNG) |
 
 **Alur agentic loop:**
 
@@ -323,7 +326,10 @@ aicutad-cli/
 
 - [x] TUI full-screen immersive (alternate buffer)
 - [x] Boot animation premium (bordered window, typewriter, multi-step)
-- [x] Agentic loop dengan function calling (6 tools)
+- [x] Agentic loop dengan function calling (9 tools)
+- [x] **Context window management** — auto-summarize old messages
+- [x] **Cost tracking** — token usage & estimasi biaya per session
+- [x] **Headless browser tools** — Chromium (browse, search, screenshot)
 - [x] Glitch-free rendering (debounced + in-place clock/spinner)
 - [x] Typing animation (AI response char-by-char)
 - [x] Interactive model picker (modal overlay, arrow keys)
@@ -352,12 +358,10 @@ aicutad-cli/
 
 - [ ] Headless server + web interface
 - [ ] Diff viewer in TUI (show file changes before apply)
-- [ ] Context window management (summarize old messages)
 - [ ] Multi-file editing in single tool call
 - [ ] Voice input (TTS/STT integration)
 - [ ] Custom tool plugins (user-defined tools)
 - [ ] Model-specific routing (different models for different tasks)
-- [ ] Cost tracking (token usage per session)
 
 ## License
 
