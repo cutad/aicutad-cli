@@ -74,7 +74,7 @@ function welcomeBox() {
   console.log();
   console.log(top);
   console.log(line(""));
-  console.log(line(`  ${pc.bold(pc.cyan("Selamat datang di AI CUTAD"))}`));
+  console.log(line(`  ${pc.bold(pc.cyan("Selamat datang di aicutad-cli"))}`));
   console.log(line(`  ${pc.dim("AI Coding Agent CLI — v0.4.0")}`));
   console.log(line(""));
   console.log(line(`  ${pc.dim("Sebelum mulai, kita perlu menghubungkan")}`));
@@ -184,7 +184,7 @@ export async function login(argv = []) {
   console.log(`  ${pc.green("✓")}\n`);
 
   // ── Step 5: Launch ──
-  const go = await confirm(`  ${pc.cyan(pc.bold("Langsung masuk ke AI CUTAD?"))}`);
+  const go = await confirm(`  ${pc.cyan(pc.bold("Langsung masuk ke aicutad-cli?"))}`);
   if (go) {
     console.log(`\n  ${pc.dim("Memulai agent interface...")}\n`);
     await sleep(300);
@@ -197,7 +197,7 @@ export async function login(argv = []) {
       model,
       provider: "cutad",
       session,
-      systemPrompt: "Kamu adalah AI CUTAD, agent coding otonom. Jawab ringkas & praktis.",
+      systemPrompt: "Kamu adalah aicutad-cli, agent coding otonom. Jawab ringkas & praktis.",
     });
   }
   console.log(`\n  ${pc.dim("Mulai kapan saja dengan:")} ${cmd("aicutad")}\n`);

@@ -5,7 +5,7 @@ import { chatCompletion } from "./api.mjs";
 import { banner, subtitle, rule, ok, fail, info, arrow, spinner, cmd, pc } from "./ui.mjs";
 
 const SYSTEM_PROMPT = [
-  "Kamu adalah AI CUTAD, asisten AI coding.",
+  "Kamu adalah aicutad-cli, asisten AI coding.",
   "Bantu menulis, memeriksa, merancang, dan menjelaskan kode.",
   "Jawab ringkas, praktis, sertakan contoh kode bila relevan.",
 ].join(" ");

@@ -11,7 +11,7 @@ const program = new Command();
 
 program
   .name("aicutad")
-  .description("AI CUTAD — AI coding agent CLI (gateway ai.cutad.web.id)")
+  .description("aicutad-cli — AI coding agent CLI (gateway ai.cutad.web.id)")
   .version(pkg.version, "-v, --version", "tampilkan versi");
 
 // │ login — setup wizard (hidden input, validasi, pilih model)      │
@@ -143,7 +143,7 @@ program.action(async () => {
     model: auth.model,
     provider: "cutad",
     session,
-    systemPrompt: "Kamu adalah AI CUTAD, asisten AI coding. Jawab ringkas, praktis, sertakan contoh kode bila relevan.",
+    systemPrompt: "Kamu adalah aicutad-cli, asisten AI coding. Jawab ringkas, praktis, sertakan contoh kode bila relevan.",
   });
 });
 

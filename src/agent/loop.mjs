@@ -16,7 +16,7 @@ import { TOOLS } from "./tools.mjs";
 import { executeTool } from "./executor.mjs";
 
 const MAX_ITERATIONS = 20;
-const AGENT_SYSTEM_PROMPT = `Kamu adalah AI CUTAD, agent coding otonom.
+const AGENT_SYSTEM_PROMPT = `Kamu adalah aicutad-cli, agent coding otonom.
 
 Kamu punya tools untuk membaca, menulis, mengedit file, menjalankan command shell, dan mencari di kode.
 

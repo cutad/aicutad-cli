@@ -7,71 +7,13 @@ import pc from "picocolors";
 // Aksen utama — satu warna biar profesional
 export const ACCENT = pc.cyan;
 
-const AI = [
-  " █████╗ ",
-  "██╔══██╗",
-  "███████║",
-  "██╔══██║",
-  "██║  ██║",
-  "╚═╝  ╚═╝",
-];
-const I_L = [
-  "██╗     ",
-  "██║     ",
-  "██║     ",
-  "██║     ",
-  "██║     ",
-  "╚═╝     ",
-];
-const C = [
-  " ██████╗",
-  "██╔════╝",
-  "██║     ",
-  "██║     ",
-  "╚██████╗",
-  " ╚═════╝",
-];
-const U = [
-  "██╗   ██╗",
-  "██║   ██║",
-  "██║   ██║",
-  "██║   ██║",
-  "╚██████╔╝",
-  " ╚═════╝ ",
-];
-const T = [
-  "████████╗",
-  "╚══██╔══╝",
-  "   ██║   ",
-  "   ██║   ",
-  "   ██║   ",
-  "   ╚═╝   ",
-];
-const D = [
-  "██████╗ ",
-  "██╔══██╗",
-  "██║  ██║",
-  "██║  ██║",
-  "██████╔╝",
-  "╚═════╝ ",
-];
-
-/** Banner ASCII bersih "AI CUTAD" dengan satu warna aksen. */
+/** Banner clean — "◆ aicutad-cli" dengan aksen cyan. */
 export function banner() {
-  const letters = [AI, I_L, null, C, U, T, AI, D];
-  const out = [];
-  for (let r = 0; r < 6; r++) {
-    let line = "";
-    for (const L of letters) {
-      line += L ? `${L[r]} ` : "    ";
-    }
-    out.push(ACCENT(line.replace(/\s+$/, "")));
-  }
-  return out.join("\n");
+  return pc.bold(ACCENT("\u25C6")) + " " + pc.bold(ACCENT("aicutad-cli"));
 }
 
-/** Nama brand (tanpa simbol aneh). */
-export function brand(s = "AI CUTAD") {
+/** Nama brand. */
+export function brand(s = "aicutad-cli") {
   return pc.bold(ACCENT(s));
 }
 

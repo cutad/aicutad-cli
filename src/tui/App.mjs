@@ -86,52 +86,46 @@ const visibleLen = (s) => ("" + s).replace(/\x1b\[[0-9;]*m/g, "").length;
 async function bootSequence(stdout, W, H) {
   stdout.write(A.altEnter + A.hideCursor + A.home + A.clearBelow);
 
+  // Clean compact logo — readable, not big block letters
   const logoLines = [
-    "    █████╗ ██████╗  ██████╗ ██╗   ██╗██████╗ ██╗███████╗",
-    "   ██╔══██╗██╔══██╗██╔════╝ ██║   ██║██╔══██╗██║██╔════╝",
-    "   ███████║██████╔╝██║  ███╗██║   ██║██████╔╝██║███████╗",
-    "   ██╔══██║██╔══██╗██║   ██║██║   ██║██╔══██╗██║╚════██║",
-    "   ██║  ██║██████╔╝╚██████╔╝╚██████╔╝██████╔╝██║███████║",
-    "   ╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝",
+    "  " + C.bold(C.teal("\u25C6")) + " " + C.bold(C.cyan("aicutad-cli")),
+    "  " + C.dim("AI Coding Agent CLI \u00B7 v0.4.0"),
   ];
 
-  const logoW = 56;
+  const logoW = 40;
   const logoH = logoLines.length;
   const startX = Math.max(1, Math.floor((W - logoW) / 2));
-  const startY = Math.max(2, Math.floor((H - logoH - 8) / 2));
+  const startY = Math.max(3, Math.floor((H - logoH - 8) / 2));
 
-  // Reveal logo line by line
+  // Reveal logo
   for (let i = 0; i < logoLines.length; i++) {
-    stdout.write(A.move(startY + i, startX) + C.teal(logoLines[i]));
-    await sleep(60);
+    stdout.write(A.move(startY + i, startX) + logoLines[i]);
+    await sleep(80);
   }
 
-  // Tagline
-  const tagline = "AI Coding Agent CLI v0.4.0";
-  stdout.write(A.move(startY + logoH + 1, Math.max(1, Math.floor((W - tagline.length) / 2))) + C.dim(tagline));
   await sleep(200);
 
   // Loading bar
-  const barW = Math.min(40, W - 12);
+  const barW = Math.min(36, W - 12);
   const barX = Math.max(1, Math.floor((W - barW - 8) / 2));
-  const barY = startY + logoH + 3;
+  const barY = startY + logoH + 2;
 
   for (let p = 0; p <= 100; p += 5) {
     const filled = Math.floor((p / 100) * barW);
     const bar = C.teal("\u2588".repeat(filled)) + C.gray("\u2591".repeat(barW - filled));
     const pct = String(p).padStart(3) + "%";
     stdout.write(A.move(barY, barX) + " " + bar + " " + C.dim(pct) + A.clearEOL);
-    await sleep(25);
+    await sleep(20);
   }
 
   // Status checks
   const checks = ["Gateway online", "Models loaded", "Ready to code"];
   for (let i = 0; i < checks.length; i++) {
     stdout.write(A.move(barY + 2 + i, barX) + "  " + C.green("\u2713") + " " + C.dim(checks[i]) + A.clearEOL);
-    await sleep(100);
+    await sleep(80);
   }
 
-  await sleep(400);
+  await sleep(300);
   stdout.write(A.home + A.clearBelow);
 }
 
@@ -322,7 +316,7 @@ export async function startTUI(config) {
     const clock = String(now.getHours()).padStart(2, "0") + ":" +
                   String(now.getMinutes()).padStart(2, "0") + ":" +
                   String(now.getSeconds()).padStart(2, "0");
-    const headerLeft = " " + C.bold(C.teal("\u25C6")) + " " + C.bold(C.cyan("AI CUTAD")) +
+    const headerLeft = " " + C.bold(C.teal("\u25C6")) + " " + C.bold(C.cyan("aicutad-cli")) +
                        " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray("v0.4.0");
     const headerRight = C.dim(clock);
     const headerPad = Math.max(1, W - visibleLen(headerLeft) - visibleLen(headerRight) - 1);
@@ -476,7 +470,7 @@ export async function startTUI(config) {
       }
       out.push(" " + C.bBlue("\u2514\u2500"));
     } else if (msg.role === "assistant") {
-      out.push(" " + C.bold(C.bGreen("\u250C\u2500 AI CUTAD")) + (ts ? " " + C.gray(ts) : ""));
+      out.push(" " + C.bold(C.bGreen("\u250C\u2500 aicutad-cli")) + (ts ? " " + C.gray(ts) : ""));
       let content = msg.content || "";
 
       // Typing animation
@@ -1099,7 +1093,7 @@ async function fallbackREPL(config) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   let messages = [];
 
-  console.log("\n" + pc.cyan(pc.bold("AI CUTAD")) + " " + pc.dim("\u2014 Mode non-TUI") + "\n");
+  console.log("\n" + pc.cyan(pc.bold("aicutad-cli")) + " " + pc.dim("\u2014 Mode non-TUI") + "\n");
 
   const loop = () => {
     rl.question(pc.cyan("you") + " " + pc.dim("\u203A") + " ", async (input) => {
@@ -1116,7 +1110,7 @@ async function fallbackREPL(config) {
           apiKey: config.apiKey,
           model: config.model,
           messages: [
-            { role: "system", content: config.systemPrompt || "Kamu adalah AI CUTAD." },
+            { role: "system", content: config.systemPrompt || "Kamu adalah aicutad-cli." },
             ...messages,
           ],
         });
