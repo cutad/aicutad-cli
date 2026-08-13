@@ -94,6 +94,13 @@ export function askHidden(label) {
 /**
  * Pilihan dari daftar memakai arrow key ↑/↓ dan Enter.
  * Non-TTY => pilihan lewat nomor.
+ *
+ * Render glitch-free:
+ * - clearEOL per baris (tidak ada residue teks lama)
+ * - \r reset ke kolom 0 sebelum tiap baris
+ * - Tidak pakai bgCyan (meninggalkan residue ANSI)
+ * - Single-write: seluruh list dibangun sebagai 1 string
+ *
  * @param {string} label
  * @param {string[]} choices
  * @returns {Promise<string|null>} pilihan yang dipilih
@@ -104,22 +111,29 @@ export function select(label, choices) {
   }
   return new Promise((resolve) => {
     let idx = 0;
-    const listHeight = choices.length + 1; // baris label + seluruh daftar
+    const lineCount = choices.length;
+    const clearEOL = "\x1b[K";
 
+    // Print label + leave space for list
     stdout.write(`\n${label}\n`);
-    const render = () => {
-      // naik ke posisi awal daftar, lalu tulis ulang
-      stdout.write(`\x1b[${listHeight}A`);
-      const lines = choices.map((c, i) => {
-        const mark = i === idx ? pc.bgCyan(pc.black(" > ")) : "   ";
-        const text = i === idx ? pc.cyan(c) : pc.white(c);
-        return `  ${mark} ${text}`;
-      });
-      stdout.write(lines.join("\n") + "\n");
-    };
+
+    function renderList() {
+      // Move cursor up to first list line
+      stdout.write(`\x1b[${lineCount}A`);
+      // Build all lines in ONE string — single write
+      let frame = "";
+      for (let i = 0; i < choices.length; i++) {
+        const selected = i === idx;
+        const marker = selected ? pc.cyan("\u25B8") : " ";
+        const text = selected ? pc.bold(pc.cyan(choices[i])) : pc.dim(choices[i]);
+        // \r resets to col 0, clearEOL removes leftover, then content
+        frame += "\r" + clearEOL + `  ${marker} ${text}` + "\n";
+      }
+      stdout.write(frame);
+    }
 
     enterRaw();
-    render();
+    renderList();
 
     const onData = (chunk) => {
       const str = chunk.toString();
@@ -130,17 +144,24 @@ export function select(label, choices) {
       }
       if (str === "\r" || str === "\n") { // Enter
         cleanup();
-        // hapus blok daftar dari layar lalu resolve
-        stdout.write(`\x1b[${listHeight - 1}A\x1b[J`);
+        // Clear the list area
+        stdout.write(`\x1b[${lineCount}A`);
+        for (let i = 0; i < lineCount; i++) {
+          stdout.write("\r" + clearEOL + "\n");
+        }
+        // Move back up and show selection
+        stdout.write(`\x1b[${lineCount}A`);
+        stdout.write("\r" + clearEOL + `  ${pc.green("\u2713")} ${pc.bold(choices[idx])}` + "\n");
         resolve(choices[idx]);
         return;
       }
-      // escape sequence arrow keys: ESC [ A/B/C/D
-      const kb = chunk.slice ? chunk : Buffer.from(str);
-      if (kb.length === 3 && kb[0] === 27 && kb[1] === 91) {
-        if (kb[2] === 65) idx = (idx - 1 + choices.length) % choices.length; // up
-        else if (kb[2] === 66) idx = (idx + 1) % choices.length; // down
-        render();
+      // Escape sequence: ESC [ A/B (arrow up/down)
+      if (str.length === 3 && str.charCodeAt(0) === 27 && str.charCodeAt(1) === 91) {
+        const code = str.charCodeAt(2);
+        if (code === 65) idx = (idx - 1 + choices.length) % choices.length; // up
+        else if (code === 66) idx = (idx + 1) % choices.length; // down
+        else return;
+        renderList();
       }
     };
 

@@ -178,11 +178,19 @@ export async function startTUI(config) {
   }
 
   // ── Timers ─────────────────────────────────────────────────
+  // CRITICAL: Timer TIDAK panggil render() (full screen redraw).
+  // Mereka update IN-PLACE: pindah cursor ke baris tertentu,
+  // tulis ulang hanya baris itu, kembalikan cursor ke input.
+  // Ini eliminasi glitch/flicker saat idle, loading, dan typing.
+
+  // Track layout positions for in-place updates
+  let layoutInfo = { spinnerRow: 0, clockRow: 1, clockCol: 1, inputRow: 0, inputCol: 1, statusRow: 0 };
+
   function startSpinner() {
     if (spinnerTimer) return;
     spinnerTimer = setInterval(() => {
       spinnerIdx = (spinnerIdx + 1) % SPINNER.length;
-      render();
+      updateSpinnerInPlace();
     }, 80);
   }
 
@@ -193,12 +201,60 @@ export async function startTUI(config) {
   function startClock() {
     if (clockTimer) return;
     clockTimer = setInterval(() => {
-      if (!loading && !typingActive) render();
+      updateClockInPlace();
     }, 1000);
   }
 
   function stopClock() {
     if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
+  }
+
+  // ── In-place spinner update (no full redraw) ───────────────
+  function updateSpinnerInPlace() {
+    if (!loading) return;
+    const { spinnerRow, inputRow, inputCol } = layoutInfo;
+    if (spinnerRow < 1) return;
+
+    const W = stdout.columns || 80;
+    const frame = SPINNER[spinnerIdx];
+    let statusText = "menunggu respons";
+    if (status === "agent") {
+      if (thinkingText) {
+        statusText = thinkingText;
+      } else if (toolCount > 0) {
+        const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) + "s" : "";
+        statusText = "bekerja \u00B7 " + toolCount + " tool \u00B7 iterasi " + iterCount +
+                     (elapsed ? " \u00B7 " + elapsed : "");
+      } else {
+        statusText = "berpikir";
+      }
+    }
+    const maxLen = W - 6;
+    const display = visibleLen(statusText) > maxLen ? statusText.slice(0, maxLen - 1) + "\u2026" : statusText;
+    const line = " " + C.cyan(frame) + " " + C.dim(display);
+
+    // Move to spinner row, clear line, write new content, restore cursor to input
+    stdout.write("\x1b[" + spinnerRow + ";1H\x1b[2K" + line);
+    // Restore cursor to input position
+    stdout.write("\x1b[" + inputRow + ";" + inputCol + "H");
+  }
+
+  // ── In-place clock update (no full redraw) ─────────────────
+  function updateClockInPlace() {
+    if (loading || typingActive || modal) return;
+    const { clockRow, clockCol, inputRow, inputCol } = layoutInfo;
+    if (clockRow < 1) return;
+
+    const now = new Date();
+    const clock = String(now.getHours()).padStart(2, "0") + ":" +
+                  String(now.getMinutes()).padStart(2, "0") + ":" +
+                  String(now.getSeconds()).padStart(2, "0");
+    const clockStr = C.dim(clock);
+
+    // Move to clock position, write clock, restore cursor
+    stdout.write("\x1b[" + clockRow + ";" + clockCol + "H" + clockStr);
+    // Restore cursor to input position
+    stdout.write("\x1b[" + inputRow + ";" + inputCol + "H");
   }
 
   function startTyping(content, msgIdx) {
@@ -212,8 +268,10 @@ export async function startTUI(config) {
       if (typingPos >= typingContent.length) {
         typingPos = typingContent.length;
         stopTyping();
+        render(); // final full render to show complete message
+      } else {
+        updateTypingInPlace();
       }
-      render();
     }, 15);
   }
 
@@ -223,6 +281,17 @@ export async function startTUI(config) {
     typingContent = "";
     typingPos = 0;
     typingMsgIdx = -1;
+  }
+
+  // ── In-place typing update (no full redraw) ────────────────
+  // For typing animation, we need to redraw the assistant message area.
+  // But ONLY the assistant message, not the whole screen.
+  // We do a targeted redraw of the message region.
+  function updateTypingInPlace() {
+    if (!typingActive || typingMsgIdx < 0) return;
+    // For typing, a full render is needed because message lines change
+    // But we use the debounced render which batches to 1 per microtask
+    render();
   }
 
   // ── Debounced render ───────────────────────────────────────
@@ -332,6 +401,21 @@ export async function startTUI(config) {
       }
     }
     prevLineCount = lines.length;
+
+    // ── Save layout positions for in-place timer updates ──
+    // Clock is on row 1 (header), at the right side
+    layoutInfo.clockRow = 1;
+    const clockStr = "00:00:00";
+    layoutInfo.clockCol = W - clockStr.length;
+    // Input is the last line
+    layoutInfo.inputRow = lines.length;
+    const promptStr = " " + C.bold(C.cyan("you \u203A")) + " ";
+    const inputDisp = input.length > (W - promptStr.length - 1) ? input.slice(input.length - (W - promptStr.length - 1)) : input;
+    layoutInfo.inputCol = promptStr.length + inputDisp.length + 1;
+    // Spinner row = last padding line before separator (the line we overwrite during loading)
+    layoutInfo.spinnerRow = lines.length - footerH; // last message area line
+    // Status row = second to last line
+    layoutInfo.statusRow = lines.length - 1;
 
     // ── Modal overlay ──
     if (modal) {
@@ -678,8 +762,8 @@ export async function startTUI(config) {
     iterCount = 0;
     thinkingText = "";
     startTime = Date.now();
+    render(); // render BEFORE startSpinner so layoutInfo is set
     startSpinner();
-    render();
 
     const { runAgentLoop } = await import("../agent/loop.mjs");
     try {

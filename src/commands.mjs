@@ -75,7 +75,7 @@ function welcomeBox() {
   console.log(top);
   console.log(line(""));
   console.log(line(`  ${pc.bold(pc.cyan("Selamat datang di AI CUTAD"))}`));
-  console.log(line(`  ${pc.dim("AI Coding Agent CLI — v0.3.0")}`));
+  console.log(line(`  ${pc.dim("AI Coding Agent CLI — v0.4.0")}`));
   console.log(line(""));
   console.log(line(`  ${pc.dim("Sebelum mulai, kita perlu menghubungkan")}`));
   console.log(line(`  ${pc.dim("CLI ke gateway AI kamu.")}`));
