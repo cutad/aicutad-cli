@@ -6,11 +6,11 @@
 
 Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatible `/v1`
 
-[![Version](https://img.shields.io/badge/version-0.4.0-cyan)]()
+[![Version](https://img.shields.io/badge/version-0.4.6-cyan)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-green)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-orange)]()
-[![Deps](https://img.shields.io/badge/dependencies-3-teal)]()
+[![Deps](https://img.shields.io/badge/dependencies-4-teal)]()
 
 </div>
 
@@ -25,7 +25,7 @@ Kamu kasih tugas, agent bekerja otonom: baca → tulis → verifikasi → lapor.
 ```
 $ aicutad agent "buat file hello.js berisi console.log hello world"
 
-  aicutad-cli agent mode · v0.4.0
+  aicutad-cli agent mode · v0.4.6
   model: deepseek-ai/deepseek-v4-pro  dir: /root/project
   ────────────────────────────────────────────────────────────
   › buat file hello.js berisi console.log hello world
@@ -109,7 +109,7 @@ Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. 
 ## TUI Full-Screen
 
 ```
- aicutad-cli │ AI Coding Agent CLI v0.4.0          19:20:35
+ aicutad-cli │ AI Coding Agent CLI v0.4.6          19:20:35
  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  ┌─ you 19:20
  │ ada apa di sini
@@ -124,44 +124,48 @@ Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. 
  │ Mau aku apain?
  └─
  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- ● │ ready │ deepseek-ai/deepseek-v4-pro │ 6 pesan │ cutad   /help
+ ● │ ready │ deepseek-ai/deepseek-v4-pro │ 6 pesan │ 1,835 tok │ $0.0010 │ ctx 2% │ cutad   /help
  you ›
 ```
 
-### Fitur TUI v0.4.0
+### Fitur TUI v0.4.6
 
 - **Boot animation premium** — bordered window, typewriter logo, multi-step progress
 - **Full-screen immersive** — alternate buffer, fokus hanya ke aicutad-cli
-- **Glitch-free rendering** — debounced single-write frame, in-place clock update
+- **Zero-glitch rendering** — absolute positioning (no `\n` scroll), in-place updates untuk input/spinner/clock
+- **Cost tracking live** — token count + biaya ($0.0010) tampil di status bar real-time
+- **Context window indicator** — `ctx 15%` dengan color coding (dim/yellow/red)
+- **Context window management** — auto-summarize pesan lama saat context >80%
 - **Typing animation** — AI response muncul char-by-char
+- **Interactive help modal** — arrow ↑/↓ navigasi, Enter pilih command, Esc tutup
 - **Interactive model picker** — arrow keys, modal overlay
-- **Input history** — ↑/↓ arrows recall pesan sebelumnya
+- **Input history** — ↑/↓ arrows recall pesan sebelumnya (saat input kosong = scroll pesan)
 - **Keyboard shortcuts** — `Ctrl+L` clear, `Ctrl+S` save, `Tab` autocomplete
-- **Modal overlays** — help, models, sessions, agents (centered bordered)
+- **Modal overlays** — help, models, sessions, agents (centered bordered, glitch-free)
 - **Live clock** — `HH:MM:SS` di header
 - **Markdown rendering** — code blocks, bold, italic, headers, lists, blockquotes
 - **Message timestamps** — `HH:MM` per message
 - **Compact tool display** — inline 1-baris dengan icon + color + status
-- **Status bar** — colored indicator (🟢 ready · 🟡 bekerja · 🔴 error)
-- **Spinner animation** — braille dots, 100ms smooth
+- **Status bar** — colored indicator (🟢 ready · 🟡 bekerja · 🔴 error · 🔵 scroll)
+- **Spinner animation** — braille dots, 100ms smooth (in-place, no redraw)
 
 ### Keyboard Shortcuts
 
 | Key | Fungsi |
 |---|---|
-| `↑` / `↓` | History navigasi / model picker scroll |
+| `↑` / `↓` | Scroll pesan (input kosong) / History navigasi (input ada) / Modal navigasi |
 | `Tab` | Autocomplete command |
 | `Ctrl+L` | Clear screen |
 | `Ctrl+S` | Save session |
 | `Ctrl+C` | Keluar |
 | `Esc` | Tutup modal |
-| `Enter` | Kirim pesan |
+| `Enter` | Kirim pesan / Pilih item di modal |
 
 ### Command di TUI
 
 | Command | Fungsi |
 |---|---|
-| `/help` | Tampilkan bantuan (modal overlay) |
+| `/help` | Bantuan (interactive modal — ↑/↓ navigasi, Enter pilih) |
 | `/models` | Pilih model (interactive modal picker) |
 | `/model <name>` | Ganti model langsung |
 | `/agents` | Daftar subagent (modal overlay) |
@@ -279,11 +283,14 @@ aicutad-cli/
 │   └── cutad.mjs              # entrypoint (Commander, 8 subcommands)
 ├── src/
 │   ├── tui/
-│   │   └── App.mjs            # TUI native full-screen (ANSI, v0.4.0)
+│   │   └── App.mjs            # TUI native full-screen (ANSI, v0.4.6)
 │   ├── agent/
-│   │   ├── tools.mjs          # 6 tool definitions (function calling)
-│   │   ├── executor.mjs       # eksekusi tool (read/write/edit/run)
+│   │   ├── tools.mjs          # 9 tool definitions (function calling)
+│   │   ├── executor.mjs       # eksekusi tool (read/write/edit/run/browse)
 │   │   ├── loop.mjs           # agentic loop (model ↔ tool, max 20 iter)
+│   │   ├── context.mjs        # context window management (auto-summarize)
+│   │   ├── cost.mjs           # cost tracking (token usage per session)
+│   │   ├── browser.mjs        # headless Chromium (Puppeteer)
 │   │   ├── run.mjs            # CLI entrypoint agent mode
 │   │   └── index.mjs          # 8 subagent + delegate parallel/chain
 │   ├── session/
@@ -316,26 +323,30 @@ aicutad-cli/
 - **Gateway:** ai.cutad.web.id (OpenAI-compatible `/v1`)
 - **Function calling:** OpenAI tools API (`tools` + `tool_choice: auto`)
 - **TUI:** Native ANSI control codes (no React/Ink dependency)
-- **Rendering:** Debounced single-write frame + in-place timer updates
-- **Dependencies:** `commander` (CLI), `picocolors` (color), `@modelcontextprotocol/sdk` (MCP)
-- **Package size:** 29.7 KB (3 deps only)
+- **Rendering:** Absolute positioning (zero-scroll) + in-place updates untuk input/spinner/clock
+- **Dependencies:** `commander` (CLI), `picocolors` (color), `@modelcontextprotocol/sdk` (MCP), `puppeteer` (browser)
+- **Package size:** 46.7 KB (4 deps)
 
 ## Roadmap
 
-### Done (v0.4.0)
+### Done (v0.4.6)
 
+- [x] **Published to npm** — `npm install -g aicutad-cli` ✅
 - [x] TUI full-screen immersive (alternate buffer)
 - [x] Boot animation premium (bordered window, typewriter, multi-step)
 - [x] Agentic loop dengan function calling (9 tools)
-- [x] **Context window management** — auto-summarize old messages
-- [x] **Cost tracking** — token usage & estimasi biaya per session
+- [x] **Context window management** — auto-summarize old messages (>80% threshold)
+- [x] **Cost tracking** — token usage & estimasi biaya per session, tampil di status bar
+- [x] **Context window indicator** — `ctx 15%` live di status bar dengan color coding
 - [x] **Headless browser tools** — Chromium (browse, search, screenshot)
-- [x] Glitch-free rendering (debounced + in-place clock/spinner)
+- [x] **Zero-glitch rendering** — absolute positioning (no `\n` scroll), in-place updates
+- [x] **Interactive help modal** — arrow ↑/↓ navigasi, Enter pilih command
+- [x] **Scroll messages** — arrow ↑/↓ saat input kosong untuk scroll percakapan
 - [x] Typing animation (AI response char-by-char)
 - [x] Interactive model picker (modal overlay, arrow keys)
 - [x] Input history (↑/↓ arrows)
 - [x] Keyboard shortcuts (Ctrl+L, Ctrl+S, Tab autocomplete)
-- [x] Modal overlays (help, models, sessions, agents)
+- [x] Modal overlays (help, models, sessions, agents — glitch-free)
 - [x] Live clock di header
 - [x] Markdown rendering (code blocks, bold, italic, headers, lists)
 - [x] Message timestamps
@@ -350,7 +361,6 @@ aicutad-cli/
 
 ### Next Priority
 
-- [ ] **Publish to npm registry**
 - [ ] **Streaming response (SSE)** — TUI shows answer token-by-token
 - [ ] **GitHub PR integration** — auto create branch, commit, push, open PR
 
