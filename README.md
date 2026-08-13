@@ -2,7 +2,7 @@
 
 # aicutad-cli
 
-**AI Coding Agent CLI** — baca, tulis, edit file & jalankan command shell otonom lewat terminal.
+**AI Coding Agent CLI** - baca, tulis, edit file & jalankan command shell otonom lewat terminal.
 
 Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatible `/v1`
 
@@ -20,7 +20,7 @@ Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatibl
 
 ## Apa itu?
 
-**aicutad-cli** adalah AI coding agent yang jalan di terminal kamu. Bukan sekadar chat — ia **baca file, tulis kode, edit file, dan jalankan command shell sendiri** lewat agentic loop dengan function calling.
+**aicutad-cli** adalah AI coding agent yang jalan di terminal kamu. Bukan sekadar chat - ia **baca file, tulis kode, edit file, dan jalankan command shell sendiri** lewat agentic loop dengan function calling.
 
 Kamu kasih tugas, agent bekerja otonom: baca → tulis → verifikasi → lapor.
 
@@ -71,14 +71,14 @@ aicutad
 
 Pertama kali jalankan, **setup wizard premium** muncul otomatis:
 
-1. **Boot animation** — bordered window, typewriter logo, system info
+1. **Boot animation** - bordered window, typewriter logo, system info
 2. **Masukkan API key** (input tersembunyi `••••••••`)
 3. **Validasi koneksi** ke gateway (animated spinner)
 4. **Pilih model** (arrow-key ↑/↓ selector, clean UI)
 5. **Simpan konfigurasi** ke `~/.cutad/auth.json`
 6. **Langsung masuk TUI** full-screen immersive
 
-Setelah setup, `aicutad` langsung buka **TUI agent** — ketik tugas apa pun, agent kerjakan.
+Setelah setup, `aicutad` langsung buka **TUI agent** - ketik tugas apa pun, agent kerjakan.
 
 ## Mode Agent
 
@@ -132,24 +132,24 @@ Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. 
 
 ### Fitur TUI v0.4.6
 
-- **Boot animation premium** — bordered window, typewriter logo, multi-step progress
-- **Full-screen immersive** — alternate buffer, fokus hanya ke aicutad-cli
-- **Zero-glitch rendering** — absolute positioning (no `\n` scroll), in-place updates untuk input/spinner/clock
-- **Cost tracking live** — token count + biaya ($0.0010) tampil di status bar real-time
-- **Context window indicator** — `ctx 15%` dengan color coding (dim/yellow/red)
-- **Context window management** — auto-summarize pesan lama saat context >80%
-- **Typing animation** — AI response muncul char-by-char
-- **Interactive help modal** — arrow ↑/↓ navigasi, Enter pilih command, Esc tutup
-- **Interactive model picker** — arrow keys, modal overlay
-- **Input history** — ↑/↓ arrows recall pesan sebelumnya (saat input kosong = scroll pesan)
-- **Keyboard shortcuts** — `Ctrl+L` clear, `Ctrl+S` save, `Tab` autocomplete
-- **Modal overlays** — help, models, sessions, agents (centered bordered, glitch-free)
-- **Live clock** — `HH:MM:SS` di header
-- **Markdown rendering** — code blocks, bold, italic, headers, lists, blockquotes
-- **Message timestamps** — `HH:MM` per message
-- **Compact tool display** — inline 1-baris dengan icon + color + status
-- **Status bar** — colored indicator (🟢 ready · 🟡 bekerja · 🔴 error · 🔵 scroll)
-- **Spinner animation** — braille dots, 100ms smooth (in-place, no redraw)
+- **Boot animation premium** - bordered window, typewriter logo, multi-step progress
+- **Full-screen immersive** - alternate buffer, fokus hanya ke aicutad-cli
+- **Zero-glitch rendering** - absolute positioning (no `\n` scroll), in-place updates untuk input/spinner/clock
+- **Cost tracking live** - token count + biaya ($0.0010) tampil di status bar real-time
+- **Context window indicator** - `ctx 15%` dengan color coding (dim/yellow/red)
+- **Context window management** - auto-summarize pesan lama saat context >80%
+- **Typing animation** - AI response muncul char-by-char
+- **Interactive help modal** - arrow ↑/↓ navigasi, Enter pilih command, Esc tutup
+- **Interactive model picker** - arrow keys, modal overlay
+- **Input history** - ↑/↓ arrows recall pesan sebelumnya (saat input kosong = scroll pesan)
+- **Keyboard shortcuts** - `Ctrl+L` clear, `Ctrl+S` save, `Tab` autocomplete
+- **Modal overlays** - help, models, sessions, agents (centered bordered, glitch-free)
+- **Live clock** - `HH:MM:SS` di header
+- **Markdown rendering** - code blocks, bold, italic, headers, lists, blockquotes
+- **Message timestamps** - `HH:MM` per message
+- **Compact tool display** - inline 1-baris dengan icon + color + status
+- **Status bar** - colored indicator (🟢 ready · 🟡 bekerja · 🔴 error · 🔵 scroll)
+- **Spinner animation** - braille dots, 100ms smooth (in-place, no redraw)
 
 ### Keyboard Shortcuts
 
@@ -167,7 +167,7 @@ Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. 
 
 | Command | Fungsi |
 |---|---|
-| `/help` | Bantuan (interactive modal — ↑/↓ navigasi, Enter pilih) |
+| `/help` | Bantuan (interactive modal - ↑/↓ navigasi, Enter pilih) |
 | `/models` | Pilih model (interactive modal picker) |
 | `/model <name>` | Ganti model langsung |
 | `/agents` | Daftar subagent (modal overlay) |
@@ -179,7 +179,7 @@ Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. 
 ## Command Line
 
 ```bash
-# Agent otonom (CLI mode — output ke terminal)
+# Agent otonom (CLI mode - output ke terminal)
 aicutad agent "buat file utils.js berisi fungsi fibonacci"
 aicutad agent "fix bug di app.js" --model deepseek-ai/deepseek-v4-pro --dir /path/to/project
 
@@ -333,22 +333,22 @@ aicutad-cli/
 
 ### Done (v0.4.6)
 
-- [x] **Published to npm** — `npm install -g aicutad-cli` ✅
+- [x] **Published to npm** - `npm install -g aicutad-cli` ✅
 - [x] TUI full-screen immersive (alternate buffer)
 - [x] Boot animation premium (bordered window, typewriter, multi-step)
 - [x] Agentic loop dengan function calling (9 tools)
-- [x] **Context window management** — auto-summarize old messages (>80% threshold)
-- [x] **Cost tracking** — token usage & estimasi biaya per session, tampil di status bar
-- [x] **Context window indicator** — `ctx 15%` live di status bar dengan color coding
-- [x] **Headless browser tools** — Chromium (browse, search, screenshot)
-- [x] **Zero-glitch rendering** — absolute positioning (no `\n` scroll), in-place updates
-- [x] **Interactive help modal** — arrow ↑/↓ navigasi, Enter pilih command
-- [x] **Scroll messages** — arrow ↑/↓ saat input kosong untuk scroll percakapan
+- [x] **Context window management** - auto-summarize old messages (>80% threshold)
+- [x] **Cost tracking** - token usage & estimasi biaya per session, tampil di status bar
+- [x] **Context window indicator** - `ctx 15%` live di status bar dengan color coding
+- [x] **Headless browser tools** - Chromium (browse, search, screenshot)
+- [x] **Zero-glitch rendering** - absolute positioning (no `\n` scroll), in-place updates
+- [x] **Interactive help modal** - arrow ↑/↓ navigasi, Enter pilih command
+- [x] **Scroll messages** - arrow ↑/↓ saat input kosong untuk scroll percakapan
 - [x] Typing animation (AI response char-by-char)
 - [x] Interactive model picker (modal overlay, arrow keys)
 - [x] Input history (↑/↓ arrows)
 - [x] Keyboard shortcuts (Ctrl+L, Ctrl+S, Tab autocomplete)
-- [x] Modal overlays (help, models, sessions, agents — glitch-free)
+- [x] Modal overlays (help, models, sessions, agents - glitch-free)
 - [x] Live clock di header
 - [x] Markdown rendering (code blocks, bold, italic, headers, lists)
 - [x] Message timestamps
@@ -363,8 +363,8 @@ aicutad-cli/
 
 ### Next Priority
 
-- [ ] **Streaming response (SSE)** — TUI shows answer token-by-token
-- [ ] **GitHub PR integration** — auto create branch, commit, push, open PR
+- [ ] **Streaming response (SSE)** - TUI shows answer token-by-token
+- [ ] **GitHub PR integration** - auto create branch, commit, push, open PR
 
 ### Future
 
