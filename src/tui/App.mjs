@@ -82,50 +82,154 @@ const COMMANDS = [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const visibleLen = (s) => ("" + s).replace(/\x1b\[[0-9;]*m/g, "").length;
 
-// ── Boot animation ───────────────────────────────────────────
+// ── Boot animation — premium experience ─────────────────────
+// Bordered window + typewriter logo + system info +
+// multi-step progress with checkmarks + smooth fade
 async function bootSequence(stdout, W, H) {
   stdout.write(A.altEnter + A.hideCursor + A.home + A.clearBelow);
 
-  // Clean compact logo — readable, not big block letters
-  const logoLines = [
-    "  " + C.bold(C.teal("\u25C6")) + " " + C.bold(C.cyan("aicutad-cli")),
-    "  " + C.dim("AI Coding Agent CLI \u00B7 v0.4.0"),
+  // ── Window dimensions ──
+  const winW = Math.min(52, W - 4);
+  const winH = 14;
+  const winX = Math.max(1, Math.floor((W - winW) / 2));
+  const winY = Math.max(1, Math.floor((H - winH) / 2));
+
+  // ── Draw bordered window (animated border draw) ──
+  const borderChar = "\u2500";
+  const cornerTL = "\u250F";
+  const cornerTR = "\u2513";
+  const cornerBL = "\u2517";
+  const cornerBR = "\u251B";
+  const sideV = "\u2502";
+
+  // Top border — draw left to right
+  let topLine = cornerTL;
+  stdout.write(A.move(winY, winX) + C.gray(cornerTL));
+  for (let i = 1; i < winW - 1; i++) {
+    await sleep(6);
+    stdout.write(A.move(winY, winX + i) + C.teal(borderChar));
+  }
+  stdout.write(A.move(winY, winX + winW - 1) + C.gray(cornerTR));
+
+  // Side borders — draw top to bottom
+  for (let r = 1; r < winH - 1; r++) {
+    stdout.write(A.move(winY + r, winX) + C.gray(sideV));
+    stdout.write(A.move(winY + r, winX + winW - 1) + C.gray(sideV));
+    await sleep(8);
+  }
+
+  // Bottom border — draw left to right
+  stdout.write(A.move(winY + winH - 1, winX) + C.gray(cornerBL));
+  for (let i = 1; i < winW - 1; i++) {
+    stdout.write(A.move(winY + winH - 1, winX + i) + C.teal(borderChar));
+    await sleep(6);
+  }
+  stdout.write(A.move(winY + winH - 1, winX + winW - 1) + C.gray(cornerBR));
+
+  await sleep(100);
+
+  // ── Typewriter logo ──
+  const logoText = "aicutad-cli";
+  const logoRow = winY + 2;
+  const logoCol = winX + Math.floor((winW - logoText.length - 2) / 2);
+
+  stdout.write(A.move(logoRow, logoCol) + C.bold(C.teal("\u25C6")) + " ");
+  await sleep(100);
+  for (let i = 0; i < logoText.length; i++) {
+    const ch = logoText[i];
+    stdout.write(A.move(logoRow, logoCol + 2 + i) + C.bold(C.cyan(ch)));
+    await sleep(35);
+  }
+
+  // Subtitle
+  const subText = "AI Coding Agent CLI";
+  const subCol = winX + Math.floor((winW - subText.length) / 2);
+  stdout.write(A.move(logoRow + 1, subCol) + C.dim(subText));
+  await sleep(150);
+
+  // Version badge
+  const verText = "v0.4.0";
+  const verCol = winX + Math.floor((winW - verText.length) / 2);
+  stdout.write(A.move(logoRow + 2, verCol) + C.gray(verText));
+  await sleep(200);
+
+  // ── System info line ──
+  const sysInfo = "Node " + process.version.replace("v", "") + "  \u00B7  " +
+                  process.platform + " " + process.arch + "  \u00B7  " +
+                  (process.env.TERM || "terminal");
+  const sysCol = winX + Math.floor((winW - sysInfo.length) / 2);
+  stdout.write(A.move(logoRow + 4, sysCol) + C.gray(sysInfo));
+  await sleep(150);
+
+  // ── Separator line inside window ──
+  const sepRow = logoRow + 5;
+  stdout.write(A.move(sepRow, winX + 1) + C.gray("\u2504".repeat(winW - 2)));
+  await sleep(100);
+
+  // ── Multi-step progress with checkmarks ──
+  const steps = [
+    "Menghubungkan ke gateway",
+    "Memuat model AI",
+    "Menyiapkan agent tools",
+    "Inisialisasi interface",
   ];
 
-  const logoW = 40;
-  const logoH = logoLines.length;
-  const startX = Math.max(1, Math.floor((W - logoW) / 2));
-  const startY = Math.max(3, Math.floor((H - logoH - 8) / 2));
+  const stepsStartRow = sepRow + 1;
+  const barW = Math.min(30, winW - 14);
+  const barRow = stepsStartRow + steps.length + 1;
+  const barCol = winX + Math.floor((winW - barW - 8) / 2);
 
-  // Reveal logo
-  for (let i = 0; i < logoLines.length; i++) {
-    stdout.write(A.move(startY + i, startX) + logoLines[i]);
+  for (let s = 0; s < steps.length; s++) {
+    const row = stepsStartRow + s;
+    const indent = winX + 3;
+
+    // Show step with pending spinner
+    const stepLabel = steps[s];
+    stdout.write(A.move(row, indent) + C.gray("\u25CB") + " " + C.dim(stepLabel) + A.clearEOL);
+
+    // Mini spinner for this step
+    const miniFrames = ["\u280B", "\u2819", "\u2839", "\u2878"];
+    for (let f = 0; f < 4; f++) {
+      stdout.write(A.move(row, indent) + C.cyan(miniFrames[f]) + " " + C.dim(stepLabel));
+      await sleep(50);
+    }
+
+    // Complete: replace spinner with checkmark
+    stdout.write(A.move(row, indent) + C.green("\u2713") + " " + C.dim(stepLabel));
+
+    // Update progress bar
+    const progress = Math.round(((s + 1) / steps.length) * 100);
+    const filled = Math.floor((progress / 100) * barW);
+    const bar = C.teal("\u2588".repeat(filled)) + C.gray("\u2592".repeat(barW - filled));
+    const pct = String(progress).padStart(3) + "%";
+    stdout.write(A.move(barRow, barCol) + C.gray("[") + bar + C.gray("] ") + C.bold(C.teal(pct)));
+
     await sleep(80);
   }
 
+  // ── Final flash ──
   await sleep(200);
+  // Flash the logo bright
+  stdout.write(A.move(logoRow, logoCol) + C.bold(C.teal("\u25C6")) + " " + C.bold(C.cyan(logoText)));
+  await sleep(150);
 
-  // Loading bar
-  const barW = Math.min(36, W - 12);
-  const barX = Math.max(1, Math.floor((W - barW - 8) / 2));
-  const barY = startY + logoH + 2;
+  // "Ready" badge
+  const readyText = "\u25C6 READY";
+  const readyCol = winX + Math.floor((winW - readyText.length) / 2);
+  stdout.write(A.move(barRow + 1, readyCol) + C.bold(C.green(readyText)));
+  await sleep(300);
 
-  for (let p = 0; p <= 100; p += 5) {
-    const filled = Math.floor((p / 100) * barW);
-    const bar = C.teal("\u2588".repeat(filled)) + C.gray("\u2591".repeat(barW - filled));
-    const pct = String(p).padStart(3) + "%";
-    stdout.write(A.move(barY, barX) + " " + bar + " " + C.dim(pct) + A.clearEOL);
+  // Fade out — clear from outside in
+  for (let r = 0; r < Math.ceil(winH / 2); r++) {
+    if (winY + r < winY + winH - 1 - r) {
+      stdout.write(A.move(winY + r, winX) + " ".repeat(winW) + A.clearEOL);
+      stdout.write(A.move(winY + winH - 1 - r, winX) + " ".repeat(winW) + A.clearEOL);
+    } else if (winY + r === winY + winH - 1 - r) {
+      stdout.write(A.move(winY + r, winX) + " ".repeat(winW) + A.clearEOL);
+    }
     await sleep(20);
   }
 
-  // Status checks
-  const checks = ["Gateway online", "Models loaded", "Ready to code"];
-  for (let i = 0; i < checks.length; i++) {
-    stdout.write(A.move(barY + 2 + i, barX) + "  " + C.green("\u2713") + " " + C.dim(checks[i]) + A.clearEOL);
-    await sleep(80);
-  }
-
-  await sleep(300);
   stdout.write(A.home + A.clearBelow);
 }
 
