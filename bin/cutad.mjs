@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// aicutad CLI — entrypoint utama (v0.2.0)
+// aicutad CLI — entrypoint utama (v0.4.0)
 import { Command } from "commander";
 import { createRequire } from "node:module";
 import { isAuthenticated } from "../src/config.mjs";

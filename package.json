@@ -1,6 +1,6 @@
 {
   "name": "aicutad-cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI coding agent CLI — baca, tulis, edit file & jalankan command otonom. Ditenagai gateway ai.cutad.web.id (OpenAI-compatible /v1).",
   "type": "module",
   "bin": {
