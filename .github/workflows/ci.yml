@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [22, 24]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,15 +20,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: npm
 
+      # npm ci (bukan npm install): gagal keras bila lockfile tidak sinkron.
+      # --ignore-scripts: skip download Chromium Puppeteer, test tidak butuh browser.
       - name: Install dependencies
-        run: npm install
+        run: npm ci --ignore-scripts
 
       - name: Syntax check all files
         run: |
-          for f in bin/*.mjs src/*.mjs src/**/*.mjs; do
+          for f in bin/*.mjs src/*.mjs src/**/*.mjs test/*.mjs; do
             node --check "$f" || exit 1
           done
+
+      - name: Run tests
+        run: npm test
 
       - name: CLI help check
         run: node bin/cutad.mjs --help

@@ -9,14 +9,13 @@
 //
 // Max 20 iterasi untuk safety.
 // ─────────────────────────────────────────────────────────────
-import fs from "node:fs";
-import path from "node:path";
 import os from "node:os";
 import { TOOLS } from "./tools.mjs";
 import { executeTool } from "./executor.mjs";
-import { needsSummarize, summarizeContext } from "./context.mjs";
+import { needsSummarize, summarizeContext, estimateMessageTokens } from "./context.mjs";
 import { createCostTracker, recordCall, getCostSummary, formatCostSummary } from "./cost.mjs";
 import { closeBrowser } from "./browser.mjs";
+import { withRetry } from "../retry.mjs";
 
 const MAX_ITERATIONS = 20;
 const AGENT_SYSTEM_PROMPT = `Kamu adalah aicutad-cli, agent coding otonom.
@@ -36,6 +35,8 @@ Saat menulis/mengedit kode:
 
 Aturan:
 - Selalu baca file sebelum edit (pastikan old_string unique & akurat)
+- Setelah menulis/mengedit kode, WAJIB verifikasi: jalankan syntax check / test yang relevan (mis. node --check, npm test). Jika gagal, PERBAIKI dulu, jangan lapor sukses.
+- Jangan pernah mengklaim selesai sebelum verifikasi lolos. Jika verifikasi tidak bisa dijalankan, katakan terus terang alasannya.
 - Jangan hapus file tanpa alasan jelas
 - Jalankan command hanya yang relevan dengan tugas
 - Jika error, perbaiki dan coba lagi
@@ -68,8 +69,11 @@ export async function runAgentLoop({
   let iterations = 0;
   let toolCallCount = 0;
   let finalResult = "";
+  let hitMaxIterations = false;
+  let finishedNormally = false;
   const costTracker = createCostTracker();
 
+  try {
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
@@ -86,19 +90,27 @@ export async function runAgentLoop({
       }
     }
 
-    // Kirim ke model dengan tools
+    // Kirim ke model dengan tools (retry untuk error transient gateway)
     const callStart = Date.now();
-    const response = await callModelWithTools(baseUrl, apiKey, model, messages);
+    const response = await withRetry(() =>
+      callModelWithTools(baseUrl, apiKey, model, messages));
     const callDuration = Date.now() - callStart;
     const choice = response?.choices?.[0];
 
-    // Cost tracking — jika gateway tidak return usage, estimasi dari messages
+    if (!choice) {
+      const errMsg = "Model tidak memberikan respons.";
+      onError?.(errMsg);
+      return { result: errMsg, iterations, toolCalls: toolCallCount, cost: costTracker };
+    }
+
+    const assistantMessage = choice.message || {};
+
+    // Cost tracking — jika gateway tidak return usage, estimasi dari messages.
+    // assistantMessage HARUS sudah didefinisikan sebelum dipakai di sini
+    // (bug lama: dipakai sebelum deklarasi -> ReferenceError TDZ).
     if (response?.usage) {
       recordCall(costTracker, response.usage, model, callDuration);
-      onCost?.(getCostSummary(costTracker));
     } else {
-      // Estimasi token dari request messages + response content
-      const { estimateMessageTokens } = await import("./context.mjs");
       const estInput = estimateMessageTokens(messages);
       const estOutput = assistantMessage?.content
         ? Math.ceil(assistantMessage.content.length / 4)
@@ -108,17 +120,8 @@ export async function runAgentLoop({
         completion_tokens: estOutput,
         total_tokens: estInput + estOutput,
       }, model, callDuration);
-      onCost?.(getCostSummary(costTracker));
     }
-
-    if (!choice) {
-      const errMsg = "Model tidak memberikan respons.";
-      onError?.(errMsg);
-      await closeBrowser();
-      return { result: errMsg, iterations, toolCalls: toolCallCount, cost: costTracker };
-    }
-
-    const assistantMessage = choice.message;
+    onCost?.(getCostSummary(costTracker));
 
     // Jika ada content (thinking/hasil), simpan & notify
     if (assistantMessage.content) {
@@ -165,16 +168,16 @@ export async function runAgentLoop({
       if (!finalResult && !assistantMessage.content) {
         finalResult = "(Model tidak memberikan respons.)";
       }
+      finishedNormally = true;
       break;
     }
   }
 
-  if (iterations >= MAX_ITERATIONS) {
+  if (!finishedNormally && iterations >= MAX_ITERATIONS) hitMaxIterations = true;
+
+  if (hitMaxIterations) {
     finalResult += "\n\n(Berhenti setelah 20 iterasi — batas aman.)";
   }
-
-  // Cleanup browser
-  await closeBrowser();
 
   return {
     result: finalResult,
@@ -183,6 +186,19 @@ export async function runAgentLoop({
     cost: costTracker,
     costSummary: formatCostSummary(costTracker),
   };
+  } catch (e) {
+    onError?.(e.message);
+    return {
+      result: `Error: ${e.message}`,
+      iterations,
+      toolCalls: toolCallCount,
+      cost: costTracker,
+      costSummary: formatCostSummary(costTracker),
+      error: e.message,
+    };
+  } finally {
+    await closeBrowser().catch(() => {});
+  }
 }
 
 /**

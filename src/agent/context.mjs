@@ -67,8 +67,13 @@ export async function summarizeContext(messages, opts = {}) {
 
   // Pisahkan: system prompt + pesan lama + pesan terbaru
   const systemMsg = messages[0];
-  const oldMessages = messages.slice(1, messages.length - KEEP_RECENT);
-  const recentMessages = messages.slice(-KEEP_RECENT);
+  // Jangan potong di tengah pasangan assistant(tool_calls) -> tool result:
+  // geser titik potong ke belakang sampai tidak mulai dari pesan 'tool',
+  // karena API menolak pesan tool tanpa tool_call induknya.
+  let cut = Math.max(1, messages.length - KEEP_RECENT);
+  while (cut > 1 && messages[cut]?.role === "tool") cut--;
+  const oldMessages = messages.slice(1, cut);
+  const recentMessages = messages.slice(cut);
 
   // Build text untuk summarize
   const conversationText = oldMessages

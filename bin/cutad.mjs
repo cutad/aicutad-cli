@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// aicutad CLI — entrypoint utama (v0.4.0)
+// aicutad CLI — entrypoint utama (versi dari package.json via src/version.mjs)
 import { Command } from "commander";
 import { createRequire } from "node:module";
 import { isAuthenticated } from "../src/config.mjs";
@@ -82,7 +82,7 @@ program
   .description("Daftar session tersimpan")
   .option("--load <id>", "Muat session berdasarkan ID")
   .option("--delete <id>", "Hapus session")
-  .option("--export <id> <path>", "Ekspor session")
+  .option("--export <spec...>", "Ekspor session: --export <id> <path>")
   .action((opts) => {
     import("../src/session/index.mjs").then((m) => {
       if (opts.delete) {
@@ -90,12 +90,30 @@ program
         console.log(`  Session ${opts.delete} dihapus.`);
         return;
       }
+      if (opts.load) {
+        const s = m.loadSession(opts.load);
+        if (!s) { console.error(`  Error: session tidak ditemukan: ${opts.load}`); process.exitCode = 1; return; }
+        console.log(JSON.stringify(s, null, 2));
+        return;
+      }
+      if (opts.export) {
+        const [id, outPath] = Array.isArray(opts.export) ? opts.export : [opts.export];
+        if (!id || !outPath) {
+          console.error("  Error: pakai --export <id> <path>");
+          process.exitCode = 1;
+          return;
+        }
+        const okExport = m.exportSession(id, outPath);
+        if (!okExport) { console.error(`  Error: session tidak ditemukan: ${id}`); process.exitCode = 1; return; }
+        console.log(`  Session ${id} diekspor ke ${outPath}`);
+        return;
+      }
       const sessions = m.listSessions();
       if (sessions.length === 0) {
         console.log("  Belum ada session.");
         return;
       }
-      sessions.forEach((s) => console.log(`  ${s.id}  ${s.model.padEnd(30)} ${s.messageCount} pesan  ${s.updatedAt}`));
+      sessions.forEach((s) => console.log(`  ${s.id}  ${String(s.model || "-").padEnd(30)} ${s.messageCount} pesan  ${s.updatedAt}`));
     });
   });
 
@@ -104,10 +122,22 @@ program
   .command("mcp")
   .description("Kelola MCP (Model Context Protocol) server")
   .option("--list", "Daftar MCP server")
-  .option("--add <name>", "Tambah MCP server")
+  .option("--add <name>", "Tambah MCP server (wajib --command)")
+  .option("--command <command>", "Command MCP server (untuk --add)")
+  .option("--args <args...>", "Argumen MCP server (untuk --add)")
   .option("--remove <name>", "Hapus MCP server")
   .option("--connect <name>", "Connect & list tools")
   .action((opts) => import("../src/mcp/index.mjs").then(async (m) => {
+    if (opts.add) {
+      if (!opts.command) {
+        console.error("  Error: --add wajib disertai --command <command>. Contoh: aicutad mcp --add fs --command npx --args -y @modelcontextprotocol/server-filesystem /tmp");
+        process.exitCode = 1;
+        return;
+      }
+      m.addMcpServer(opts.add, { command: opts.command, args: opts.args || [] });
+      console.log(`  MCP server ${opts.add} ditambahkan: ${opts.command} ${(opts.args || []).join(" ")}`);
+      return;
+    }
     if (opts.remove) { m.removeMcpServer(opts.remove); console.log(`  MCP server ${opts.remove} dihapus.`); return; }
     if (opts.connect) {
       try {

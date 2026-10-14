@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { CONFIG_DIR } from "../constants.mjs";
+import { atomicWriteFileSync } from "../fs-utils.mjs";
 
 const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
 
@@ -47,7 +48,16 @@ export function saveSession(session) {
   ensureDir();
   session.updatedAt = new Date().toISOString();
   const file = path.join(SESSIONS_DIR, `${session.id}.json`);
-  fs.writeFileSync(file, JSON.stringify(session, null, 2));
+  // Backup versi valid sebelumnya, lalu tulis ATOMIK (temp+rename).
+  // Proses mati di tengah tidak akan meninggalkan session korup:
+  // file lama tetap utuh sampai rename berhasil.
+  try {
+    if (fs.existsSync(file)) {
+      JSON.parse(fs.readFileSync(file, "utf8"));
+      fs.copyFileSync(file, `${file}.bak`);
+    }
+  } catch {}
+  atomicWriteFileSync(file, JSON.stringify(session, null, 2), { mode: 0o600 });
   return session.id;
 }
 
@@ -60,9 +70,16 @@ export function loadSession(id) {
   const file = path.join(SESSIONS_DIR, `${id}.json`);
   try {
     return JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    return null;
-  }
+  } catch {}
+  // Recovery: coba backup terakhir yang valid
+  try {
+    return JSON.parse(fs.readFileSync(`${file}.bak`, "utf8"));
+  } catch {}
+  // Keduanya korup: karantina file rusak agar tidak menghalangi sesi baru
+  try {
+    if (fs.existsSync(file)) fs.renameSync(file, `${file}.corrupt-${Date.now()}`);
+  } catch {}
+  return null;
 }
 
 /**

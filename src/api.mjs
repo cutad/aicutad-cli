@@ -1,19 +1,32 @@
 // Lapisan komunikasi dengan gateway OpenAI-compatible (cutad.web.id)
 import { authHeaders } from "./config.mjs";
+import { withRetry, isTransientError } from "./retry.mjs";
 import { REQUEST_TIMEOUT_MS } from "./constants.mjs";
 
 /**
  * Fetch ke gateway dengan timeout.
  */
-async function gatewayFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+async function gatewayFetchOnce(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    return res;
+    return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function gatewayFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  // Retry hanya aman untuk: error network, atau respons 429/5xx.
+  // Body request berupa string sehingga aman diulang.
+  return withRetry(async () => {
+    const res = await gatewayFetchOnce(url, options, timeoutMs);
+    if (res.status === 429 || res.status >= 500) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}: ${detail.slice(0, 200)}`);
+    }
+    return res;
+  });
 }
 
 /**

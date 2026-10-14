@@ -21,7 +21,7 @@ export function readMcpConfig() {
 /** Simpan config MCP. */
 export function writeMcpConfig(config) {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(MCP_FILE, JSON.stringify(config, null, 2));
+  fs.writeFileSync(MCP_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
 }
 
 /**

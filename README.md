@@ -6,8 +6,8 @@
 
 Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatible `/v1`
 
-[![Version](https://img.shields.io/badge/version-0.4.7-cyan)]()
-[![Node](https://img.shields.io/badge/node-%E2%89%A518-green)]()
+[![Version](https://img.shields.io/badge/version-0.5.0-cyan)]()
+[![Node](https://img.shields.io/badge/node-%E2%89%A522.12-green)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-orange)]()
 [![Deps](https://img.shields.io/badge/dependencies-4-teal)]()
@@ -61,7 +61,7 @@ cd aicutad-cli
 npm install -g .
 ```
 
-**Persyaratan:** Node.js ≥ 18 (disarankan ≥ 22)
+**Persyaratan:** Node.js ≥ 22.12
 
 ## Mulai Cepat
 
@@ -312,7 +312,7 @@ aicutad-cli/
 │   ├── prompt.mjs             # masked input + arrow selector (glitch-free)
 │   └── ui.mjs                 # UI toolkit (banner, panel, spinner)
 ├── .github/workflows/
-│   ├── ci.yml                 # CI test (Node 18/20/22)
+│   ├── ci.yml                 # CI test (Node 22/24)
 │   └── publish.yml            # Auto-publish to npm on release
 ├── .gitignore
 ├── package.json
@@ -321,7 +321,7 @@ aicutad-cli/
 
 ## Teknologi
 
-- **Runtime:** Node.js ≥ 18 (ESM, zero native deps)
+- **Runtime:** Node.js ≥ 22.12 (ESM)
 - **Gateway:** ai.cutad.web.id (OpenAI-compatible `/v1`)
 - **Function calling:** OpenAI tools API (`tools` + `tool_choice: auto`)
 - **TUI:** Native ANSI control codes (no React/Ink dependency)

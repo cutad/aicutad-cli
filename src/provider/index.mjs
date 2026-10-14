@@ -37,7 +37,7 @@ export function readProviders() {
  */
 export function writeProviders(config) {
   ensureDir();
-  fs.writeFileSync(PROVIDERS_FILE, JSON.stringify(config, null, 2));
+  fs.writeFileSync(PROVIDERS_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
 }
 
 /**
@@ -128,9 +128,10 @@ export function syncToAuth() {
   const auth = {
     apiKey: provider.apiKey,
     baseUrl: provider.baseUrl,
-    site: provider.site || (provider.baseUrl.endsWith("/v1") ? provider.baseUrl.slice(0, 3) : provider.baseUrl),
+    site: provider.site || (provider.baseUrl.endsWith("/v1") ? provider.baseUrl.slice(0, -3) : provider.baseUrl),
   };
-  fs.writeFileSync(path.join(CONFIG_DIR, "auth.json"), JSON.stringify(auth, null, 2));
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(CONFIG_DIR, "auth.json"), JSON.stringify(auth, null, 2), { mode: 0o600 });
 }
 
 export { PROVIDERS_FILE };

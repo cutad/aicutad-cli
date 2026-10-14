@@ -15,6 +15,7 @@
 import pc from "picocolors";
 import { readAuth, resolveBase } from "../config.mjs";
 import { runAgentLoop } from "./loop.mjs";
+import { VERSION } from "../version.mjs";
 
 const TOOL_ICON = {
   read_file: "\u{1F4D6}",
@@ -59,7 +60,7 @@ export async function runCliAgent(task, opts = {}) {
 
   // ── Boot header ────────────────────────────────────────────
   console.log();
-  console.log("  " + pc.bold(pc.cyan("aicutad-cli")) + " " + pc.dim("agent mode \u00B7 v0.4.0"));
+  console.log("  " + pc.bold(pc.cyan("aicutad-cli")) + " " + pc.dim(`agent mode \u00B7 v${VERSION}`));
   console.log("  " + pc.dim("model:") + " " + pc.white(model) + "  " + pc.dim("dir:") + " " + pc.white(cwd));
   console.log("  " + pc.dim("\u2501".repeat(60)));
   console.log();
@@ -94,6 +95,15 @@ export async function runCliAgent(task, opts = {}) {
   startSpinner("berpikir\u2026");
 
   const startTime = Date.now();
+
+  // Simpan sesi sejak awal (atomik) agar kalau proses mati di tengah,
+  // tugas & progres terakhir tetap bisa dilacak dari 'aicutad sessions'.
+  let cliSession = null;
+  try {
+    const { createSession, appendMessage } = await import("../session/index.mjs");
+    cliSession = createSession(model, "cutad-agent-cli");
+    appendMessage(cliSession, { role: "user", content: task });
+  } catch {}
 
   // ── Run agent loop ─────────────────────────────────────────
   const result = await runAgentLoop({
@@ -141,6 +151,15 @@ export async function runCliAgent(task, opts = {}) {
   });
 
   stopSpinner();
+
+  // Catat hasil akhir ke sesi (sukses maupun error)
+  if (cliSession) {
+    try {
+      const { appendMessage } = await import("../session/index.mjs");
+      appendMessage(cliSession, { role: "assistant", content: result.result || "" });
+      console.log("  " + pc.dim(`sesi: ${cliSession.id}`));
+    } catch {}
+  }
 
   // ── Summary ────────────────────────────────────────────────
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1) + "s";

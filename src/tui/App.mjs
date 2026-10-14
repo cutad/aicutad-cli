@@ -22,6 +22,7 @@ import { listAgents } from "../agent/index.mjs";
 import { listSessions, saveSession, appendMessage, createSession } from "../session/index.mjs";
 import { formatTokens } from "../agent/cost.mjs";
 import { estimateMessageTokens } from "../agent/context.mjs";
+import { VERSION } from "../version.mjs";
 
 // ── 256-color palette ────────────────────────────────────────
 const C = {
@@ -154,7 +155,7 @@ async function bootSequence(stdout, W, H) {
   await sleep(150);
 
   // Version badge
-  const verText = "v0.4.6";
+  const verText = `v${VERSION}`;
   const verCol = winX + Math.floor((winW - verText.length) / 2);
   stdout.write(A.move(logoRow + 2, verCol) + C.gray(verText));
   await sleep(200);
@@ -459,7 +460,7 @@ export async function startTUI(config) {
                   String(now.getMinutes()).padStart(2, "0") + ":" +
                   String(now.getSeconds()).padStart(2, "0");
     const headerLeft = " " + C.bold(C.cyan("aicutad-cli")) +
-                       " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray("v0.4.6");
+                       " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray(`v${VERSION}`);
     const headerRight = C.dim(clock);
     const headerPad = Math.max(1, W - visibleLen(headerLeft) - visibleLen(headerRight) - 1);
     lines.push(headerLeft + " ".repeat(headerPad) + headerRight);
@@ -777,7 +778,12 @@ export async function startTUI(config) {
   }
 
   function buildAgentTask(userMsg, history) {
-    const recent = history
+    // history sudah memuat userMsg sebagai pesan terakhir (addMessage
+    // dipanggil sebelum ini) -> buang duplikatnya agar tidak terkirim 2x.
+    const cleaned = [...history];
+    const lastIdx = cleaned.map((m) => m.role).lastIndexOf("user");
+    if (lastIdx >= 0 && cleaned[lastIdx].content === userMsg) cleaned.splice(lastIdx, 1);
+    const recent = cleaned
       .filter((m) => m.role === "user" || m.role === "assistant")
       .slice(-6)
       .map((m) => (m.role === "user" ? "User" : "AI") + ": " + m.content)

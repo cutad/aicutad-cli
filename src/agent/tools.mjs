@@ -13,6 +13,8 @@ export const TOOLS = [
         type: "object",
         properties: {
           path: { type: "string", description: "Path relatif atau absolut ke file." },
+          offset: { type: "number", description: "Mulai dari baris ke-N (1-based, opsional untuk file besar)." },
+          limit: { type: "number", description: "Jumlah baris maksimum yang dibaca (opsional, maks 5000)." },
         },
         required: ["path"],
       },

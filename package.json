@@ -1,7 +1,7 @@
 {
   "name": "aicutad-cli",
-  "version": "0.4.8",
-  "description": "AI coding agent CLI — baca, tulis, edit file & jalankan command otonom. Ditenagai gateway ai.cutad.web.id (OpenAI-compatible /v1).",
+  "version": "0.5.0",
+  "description": "AI coding agent CLI \u2014 baca, tulis, edit file & jalankan command otonom. Ditenagai gateway ai.cutad.web.id (OpenAI-compatible /v1).",
   "type": "module",
   "bin": {
     "aicutad": "bin/cutad.mjs"
@@ -11,10 +11,10 @@
     "src/"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   },
   "keywords": [
     "cli",
@@ -32,18 +32,18 @@
   ],
   "author": "rudiansyah1998 <rudiansyah1998@users.noreply.github.com>",
   "license": "MIT",
-  "homepage": "https://github.com/rudiansyah1998/aicutad-cli#readme",
+  "homepage": "https://github.com/cutad/aicutad-cli#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rudiansyah1998/aicutad-cli.git"
+    "url": "git+https://github.com/cutad/aicutad-cli.git"
   },
   "bugs": {
-    "url": "https://github.com/rudiansyah1998/aicutad-cli/issues"
+    "url": "https://github.com/cutad/aicutad-cli/issues"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "commander": "^12.1.0",
     "picocolors": "^1.1.1",
-    "puppeteer": "^23.0.0"
+    "puppeteer": "^25.13.0"
   }
 }

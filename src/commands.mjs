@@ -8,6 +8,7 @@ import {
 import { listModels } from "./api.mjs";
 import { banner, subtitle, rule, panel, row, ok, fail, info, cmd, pc } from "./ui.mjs";
 import { askHidden, askPlain, select, confirm } from "./prompt.mjs";
+import { VERSION } from "./version.mjs";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -75,7 +76,7 @@ function welcomeBox() {
   console.log(top);
   console.log(line(""));
   console.log(line(`  ${pc.bold(pc.cyan("Selamat datang di aicutad-cli"))}`));
-  console.log(line(`  ${pc.dim("AI Coding Agent CLI — v0.4.0")}`));
+  console.log(line(`  ${pc.dim(`AI Coding Agent CLI — v${VERSION}`)}`));
   console.log(line(""));
   console.log(line(`  ${pc.dim("Sebelum mulai, kita perlu menghubungkan")}`));
   console.log(line(`  ${pc.dim("CLI ke gateway AI kamu.")}`));

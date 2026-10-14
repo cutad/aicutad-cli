@@ -4,10 +4,10 @@
 // Agent bisa: buka URL, baca konten, screenshot, klik elemen,
 // ekstrak teks, jalankan JavaScript di halaman.
 //
-// Pakai puppeteer-core + chromium-browser yang sudah terinstall.
-// Tidak download Chromium tambahan — pakai yang sistem.
+// Pakai Chromium bawaan Puppeteer (di-download saat npm install).
+// Fallback ke Chromium sistem bila bawaan Puppeteer tidak tersedia.
+// Path sistem mencakup Linux, macOS, dan Windows.
 // ─────────────────────────────────────────────────────────────
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -21,7 +21,9 @@ let _browser = null;
 let _lastActivity = 0;
 const IDLE_TIMEOUT = 60000; // close browser after 60s idle
 
-// Cari executable Chromium
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Cari executable Chromium sistem (fallback saja)
 function findChromium() {
   const paths = [
     "/usr/bin/chromium-browser",
@@ -30,6 +32,10 @@ function findChromium() {
     "/usr/bin/google-chrome-stable",
     "/usr/local/bin/chromium",
     "/snap/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
   ];
   for (const p of paths) {
     try {
@@ -89,28 +95,31 @@ async function getBrowser() {
     throw new Error("Puppeteer tidak tersedia. Install: npm install puppeteer");
   }
 
-  const execPath = findChromium();
-  if (!execPath) {
-    throw new Error("Chromium tidak ditemukan. Install: apt install chromium-browser");
-  }
+  const launchArgs = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--no-first-run",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--disable-sync",
+    "--metrics-recording-only",
+    "--disable-default-apps",
+    "--no-default-browser-check",
+  ];
 
-  _browser = await puppeteer.launch({
-    executablePath: execPath,
-    headless: "new",
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-first-run",
-      "--disable-extensions",
-      "--disable-background-networking",
-      "--disable-sync",
-      "--metrics-recording-only",
-      "--disable-default-apps",
-      "--no-default-browser-check",
-    ],
-  });
+  // 1) Chromium bawaan Puppeteer (tanpa executablePath)
+  try {
+    _browser = await puppeteer.launch({ headless: true, args: launchArgs });
+  } catch (bundledErr) {
+    // 2) Fallback: Chromium sistem
+    const execPath = findChromium();
+    if (!execPath) {
+      throw new Error(`Chromium tidak ditemukan. Puppeteer: ${bundledErr.message}. Install Chromium sistem atau jalankan 'npx puppeteer browsers install chrome'.`);
+    }
+    _browser = await puppeteer.launch({ executablePath: execPath, headless: true, args: launchArgs });
+  }
 
   _lastActivity = now;
   return _browser;
@@ -146,7 +155,7 @@ export async function browsePage(url, opts = {}) {
 
     // Tunggu sebentar untuk dynamic content
     if (opts.wait) {
-      await page.waitForTimeout(Math.min(opts.wait, 5000));
+      await sleepMs(Math.min(opts.wait, 5000));
     }
 
     // Ekstrak teks
@@ -185,7 +194,7 @@ export async function screenshotPage(url, opts = {}) {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
 
     if (opts.wait) {
-      await page.waitForTimeout(Math.min(opts.wait, 5000));
+      await sleepMs(Math.min(opts.wait, 5000));
     }
 
     // Buat dir untuk screenshot
@@ -259,7 +268,7 @@ export async function evalPage(url, jsCode, opts = {}) {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
 
     if (opts.wait) {
-      await page.waitForTimeout(Math.min(opts.wait, 5000));
+      await sleepMs(Math.min(opts.wait, 5000));
     }
 
     const result = await page.evaluate(jsCode);

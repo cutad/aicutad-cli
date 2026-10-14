@@ -25,7 +25,7 @@ export async function chat(prompt, argv = [], useTui = false) {
 
   const { BASE_URL } = resolveBase(argv);
   const promptText = (prompt || "").trim();
-  const model = auth.model || reqModel(argv);
+  const model = reqModel(argv) || auth.model;
 
   if (!promptText && useTui) {
     return launchTui(auth, BASE_URL, model);
