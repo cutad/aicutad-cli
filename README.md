@@ -27,22 +27,17 @@ Kamu kasih tugas, agent bekerja otonom: baca → tulis → verifikasi → lapor.
 ```
 $ aicutad agent "buat file hello.js berisi console.log hello world"
 
-  aicutad-cli agent mode · v0.4.6
+  aicutad-cli agent mode - v0.5.0
   model: deepseek-ai/deepseek-v4-pro  dir: /root/project
-  ────────────────────────────────────────────────────────────
-  › buat file hello.js berisi console.log hello world
-  ────────────────────────────────────────────────────────────
 
-  ⠋ berpikir…
-  📝 Write (hello.js, 42 bytes)
-  📝 Write ✓ (1 baris)
-  📖 Read (hello.js)
-  📖 Read ✓ (2 baris)
-  ⚡ Run (node hello.js)
-  ⚡ Run ✓ (2 baris)
+  > buat file hello.js berisi console.log hello world
 
-  ────────────────────────────────────────────────────────────
-  aicutad-cli selesai · 4 iterasi · 3 tools · 1.2s
+  write Write (hello.js, 42 bytes)
+  write Write ok (1 baris, syntax OK)
+  read Read (hello.js)
+  run Run (node hello.js) ok
+
+  aicutad-cli selesai - 3 iterasi - 3 tools - 1.2s
 
   File hello.js berhasil dibuat & diverifikasi. Output: "Hello, World!"
 ```
@@ -69,14 +64,14 @@ npm install -g .
 aicutad
 ```
 
-Pertama kali jalankan, **setup wizard premium** muncul otomatis:
+Pertama kali jalankan, **setup wizard** muncul otomatis:
 
 1. **Boot animation** - bordered window, typewriter logo, system info
 2. **Masukkan API key** (input tersembunyi `••••••••`)
 3. **Validasi koneksi** ke gateway (animated spinner)
 4. **Pilih model** (arrow-key ↑/↓ selector, clean UI)
 5. **Simpan konfigurasi** ke `~/.cutad/auth.json`
-6. **Langsung masuk TUI** full-screen immersive
+6. **Langsung masuk TUI** full-screen
 
 Setelah setup, `aicutad` langsung buka **TUI agent** - ketik tugas apa pun, agent kerjakan.
 
@@ -132,8 +127,8 @@ Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. 
 
 ### Fitur TUI v0.4.6
 
-- **Boot animation premium** - bordered window, typewriter logo, multi-step progress
-- **Full-screen immersive** - alternate buffer, fokus hanya ke aicutad-cli
+- **Splash singkat** - informasi versi & runtime, tanpa animasi berlapis
+- **Full-screen** - alternate buffer, fokus hanya ke aicutad-cli
 - **Zero-glitch rendering** - absolute positioning (no `\n` scroll), in-place updates untuk input/spinner/clock
 - **Cost tracking live** - token count + biaya ($0.0010) tampil di status bar real-time
 - **Context window indicator** - `ctx 15%` dengan color coding (dim/yellow/red)
@@ -193,7 +188,7 @@ aicutad chat "jelaskan apa itu closure"
 aicutad chat
 
 # Manajemen
-aicutad login      # setup wizard premium
+aicutad login      # setup wizard
 aicutad status     # cek status login + jumlah model
 aicutad models     # daftar model dari gateway
 aicutad agents     # daftar subagent
@@ -338,7 +333,7 @@ aicutad-cli/
 │   │   └── index.mjs          # load external modules
 │   ├── api.mjs                # gateway komunikasi (models + chat)
 │   ├── chat.mjs               # REPL + TUI launcher
-│   ├── commands.mjs           # login wizard premium / status / logout
+│   ├── commands.mjs           # login wizard / status / logout
 │   ├── config.mjs             # baca/tulis auth
 │   ├── constants.mjs          # URL & konstanta
 │   ├── models.mjs             # daftar model
@@ -367,8 +362,8 @@ aicutad-cli/
 ### Done (v0.4.6)
 
 - [x] **Published to npm** - `npm install -g aicutad-cli` ✅
-- [x] TUI full-screen immersive (alternate buffer)
-- [x] Boot animation premium (bordered window, typewriter, multi-step)
+- [x] TUI full-screen (alternate buffer)
+- [x] Splash statis singkat
 - [x] Agentic loop dengan function calling (9 tools)
 - [x] **Context window management** - auto-summarize old messages (>80% threshold)
 - [x] **Cost tracking** - token usage & estimasi biaya per session, tampil di status bar
@@ -390,7 +385,7 @@ aicutad-cli/
 - [x] MCP client support
 - [x] Multi-provider config
 - [x] Plugin system
-- [x] First-run wizard premium
+- [x] First-run wizard
 - [x] CI/CD (GitHub Actions)
 - [x] Login wizard dengan animated spinner & progress bar
 

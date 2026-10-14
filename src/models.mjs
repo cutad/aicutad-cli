@@ -4,6 +4,7 @@ import { listModels } from "./api.mjs";
 import { banner, subtitle, rule, panel, ok, fail, spinner, cmd, pc } from "./ui.mjs";
 
 export async function models(argv = []) {
+  const jsonMode = argv.includes("--json");
   const auth = readAuth();
   if (!auth.apiKey) {
     console.error(`\n  ${fail("Belum login. Jalankan `login` dulu.")}`);
@@ -12,19 +13,27 @@ export async function models(argv = []) {
 
   const { BASE_URL } = resolveBase(argv);
 
-  console.log(`\n${banner()}\n  ${subtitle()}\n${rule()}\n`);
+  if (!jsonMode) console.log(`\n${banner()}\n  ${subtitle()}\n${rule()}\n`);
 
-  const stop = spinner("Memuat daftar model ...");
+  const stop = jsonMode ? (async () => "") : spinner("Memuat daftar model ...");
   let list = [];
   try {
     list = await listModels(auth.baseUrl || BASE_URL, auth.apiKey);
     await stop();
   } catch (e) {
     await stop();
-    console.log(`\n  ${fail(e.message)}`);
+    if (jsonMode) {
+      console.log(JSON.stringify({ error: e.message, baseUrl: auth.baseUrl || BASE_URL, models: [] }, null, 2));
+    } else {
+      console.log(`\n  ${fail(e.message)}`);
+    }
     process.exit(1);
   }
 
+  if (jsonMode) {
+    console.log(JSON.stringify({ baseUrl: auth.baseUrl || BASE_URL, modelCount: list.length, models: list.map((x) => x.id) }, null, 2));
+    return;
+  }
   const header = `Model di ${pc.cyan(auth.baseUrl || BASE_URL)}  (${list.length})`;
   if (list.length === 0) {
     console.log(panel(header, [`  ${pc.dim("(kosong)")}`]));

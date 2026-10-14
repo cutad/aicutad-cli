@@ -14,8 +14,24 @@ const program = new Command();
 
 program
   .name("aicutad")
-  .description("aicutad-cli — AI coding agent CLI (gateway ai.cutad.web.id)")
-  .version(pkg.version, "-v, --version", "tampilkan versi");
+  .description("aicutad-cli - AI coding agent CLI (gateway ai.cutad.web.id)")
+  .version(pkg.version, "-v, --version", "tampilkan versi")
+  .addHelpText("after", `
+Contoh:
+  aicutad                         Buka TUI (atau wizard bila belum login)
+  aicutad login                   Setup API key & model
+  aicutad agent "perbaiki bug X"  Jalankan agent otonom
+  aicutad agent -y "tulis tes"    Agent tanpa prompt persetujuan
+  aicutad chat "halo"             Chat satu kali (streaming)
+  aicutad status --json           Status dalam JSON (untuk skrip/CI)
+  aicutad resume <session-id>     Lanjutkan sesi tersimpan
+  aicutad rollback --list         Daftar checkpoint agent
+
+Lingkungan:
+  CUTAD_PROFILE=<name>   Profile config terpisah (~/.cutad/profiles/<name>)
+  CUTAD_BASE=<url>       Override base URL gateway
+  NO_COLOR=1             Nonaktifkan warna
+`);
 
 // │ login — setup wizard (hidden input, validasi, pilih model)      │
 program
@@ -29,6 +45,7 @@ program
   .command("status")
   .description("Status login + daftar model")
   .option("-b, --base <url>", "Base URL gateway")
+  .option("--json", "Keluarkan JSON (untuk skrip/CI)")
   .action((opts) => import("../src/commands.mjs").then((m) => m.status(buildArgv(opts))));
 
 // │ logout — hapus kredensial                                         │
@@ -42,6 +59,7 @@ program
   .command("models")
   .description("Daftar model dari gateway")
   .option("-b, --base <url>", "Base URL gateway")
+  .option("--json", "Keluarkan JSON (untuk skrip/CI)")
   .action((opts) => import("../src/models.mjs").then((m) => m.models(buildArgv(opts))));
 
 // │ chat — kirim pesan / mode interaktif / TUI                        │
@@ -108,6 +126,7 @@ program
   .option("--load <id>", "Muat session berdasarkan ID")
   .option("--delete <id>", "Hapus session")
   .option("--export <spec...>", "Ekspor session: --export <id> <path>")
+  .option("--json", "Keluarkan JSON (untuk skrip/CI)")
   .action((opts) => {
     import("../src/session/index.mjs").then((m) => {
       if (opts.delete) {
@@ -134,6 +153,7 @@ program
         return;
       }
       const sessions = m.listSessions();
+      if (opts.json) { console.log(JSON.stringify(sessions, null, 2)); return; }
       if (sessions.length === 0) {
         console.log("  Belum ada session.");
         return;
@@ -152,6 +172,7 @@ program
   .option("--args <args...>", "Argumen MCP server (untuk --add)")
   .option("--remove <name>", "Hapus MCP server")
   .option("--connect <name>", "Connect & list tools")
+  .option("--json", "Keluarkan JSON (untuk skrip/CI)")
   .action((opts) => import("../src/mcp/index.mjs").then(async (m) => {
     if (opts.add) {
       if (!opts.command) {
@@ -173,6 +194,7 @@ program
       return;
     }
     const servers = m.listMcpServers();
+    if (opts.json) { console.log(JSON.stringify(servers, null, 2)); return; }
     if (servers.length === 0) { console.log("  Belum ada MCP server."); return; }
     servers.forEach((s) => console.log(`  ${s.name.padEnd(20)} ${s.command} ${(s.args||[]).join(" ")} ${s.enabled ? "✓" : "✗"}`));
   }));
@@ -182,8 +204,10 @@ program
   .command("audit")
   .description("Lihat audit log eksekusi tool (~/.cutad/audit.log)")
   .option("--limit <n>", "Jumlah entri terakhir", "50")
+  .option("--json", "Keluarkan JSON (untuk skrip/CI)")
   .action((opts) => import("../src/audit-log.mjs").then((m) => {
     const entries = m.readAuditLog(Number(opts.limit) || 50);
+    if (opts.json) { console.log(JSON.stringify(entries, null, 2)); return; }
     if (!entries.length) { console.log("  Audit log kosong."); return; }
     entries.forEach((e) => console.log(`  ${e.ts}  ${String(e.tool).padEnd(14)} ${e.ok ? "ok " : "ERR"}  ${JSON.stringify(e.args)}`));
   }));
@@ -255,5 +279,6 @@ function buildArgv(opts) {
   const args = ["node", "aicutad"];
   if (opts?.base) args.push("--base", opts.base);
   if (opts?.model) args.push("--model", opts.model);
+  if (opts?.json) args.push("--json");
   return args;
 }

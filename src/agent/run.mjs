@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // Agent runner v2 — CLI entrypoint untuk agentic loop
-// Premium terminal output: boot header, animated spinner,
+// Terminal output: boot header, animated spinner,
 // colored tool calls, thinking indicator, clean summary
 //
 // Features:
@@ -18,13 +18,17 @@ import { runAgentLoop } from "./loop.mjs";
 import { VERSION } from "../version.mjs";
 import { createInterface } from "node:readline";
 
+// Label teks, bukan emoji (konsisten di semua terminal)
 const TOOL_ICON = {
-  read_file: "\u{1F4D6}",
-  write_file: "\u{1F4DD}",
-  edit_file: "\u270F\uFE0F",
-  list_files: "\u{1F4C2}",
-  search_files: "\u{1F50D}",
-  run_command: "\u26A1",
+  read_file: "read",
+  write_file: "write",
+  edit_file: "edit",
+  list_files: "list",
+  search_files: "search",
+  run_command: "run",
+  browse_page: "browse",
+  web_search: "web",
+  screenshot: "shot",
 };
 
 const TOOL_COLOR = {
@@ -136,14 +140,14 @@ export async function runCliAgent(task, opts = {}) {
 
     onToolCall: (name, args) => {
       stopSpinner();
-      const icon = TOOL_ICON[name] || "\u{1F527}";
+      const icon = TOOL_ICON[name] || "tool";
       const color = TOOL_COLOR[name] || pc.yellow;
       const argStr = formatArgs(name, args);
       console.log("  " + icon + " " + pc.bold(color(name)) + (argStr ? pc.dim(" (" + argStr + ")") : ""));
     },
 
     onToolResult: (name, result) => {
-      const icon = TOOL_ICON[name] || "\u{1F527}";
+      const icon = TOOL_ICON[name] || "tool";
       const color = TOOL_COLOR[name] || pc.green;
       const lines = result.split("\n").length;
       const preview = result.split("\n").slice(0, 2).join("\n");

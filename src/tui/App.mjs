@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────
-// TUI native v3 — Premium full-screen immersive agent interface
+// TUI native v3 - full-screen agent interface
 //
 // Features:
 // 1. Boot animation (logo reveal + loading bar + status checks)
-// 2. Full-screen immersive (alternate buffer, app-like feel)
+// 2. Full-screen (alternate buffer)
 // 3. Typing animation (AI response appears char-by-char)
 // 4. Interactive model picker (arrow keys, modal overlay)
 // 5. Input history (Up/Down arrows)
@@ -23,6 +23,7 @@ import { listSessions, saveSession, appendMessage } from "../session/index.mjs";
 import { formatTokens } from "../agent/cost.mjs";
 import { estimateMessageTokens } from "../agent/context.mjs";
 import { VERSION } from "../version.mjs";
+import { getLayout, isColorEnabled, isReducedMotion, truncateText } from "./layout.mjs";
 
 // ── 256-color palette ────────────────────────────────────────
 const C = {
@@ -60,18 +61,26 @@ const A = {
   move: (r, c) => `\x1b[${r};${c}H`,
 };
 
+// Hormati NO_COLOR / TERM=dumb: semua fungsi warna jadi identitas.
+if (!isColorEnabled()) {
+  for (const k of Object.keys(C)) {
+    if (typeof C[k] === "function") C[k] = (s) => String(s);
+  }
+}
+
 const SPINNER = ["\u280B", "\u2819", "\u2839", "\u2878", "\u287C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"];
 
+// Label teks singkat, bukan emoji: konsisten & profesional di semua terminal.
 const TOOL_STYLE = {
-  read_file:    { icon: "\u{1F4D6}", color: C.blue,   label: "Read" },
-  write_file:   { icon: "\u{1F4DD}", color: C.green,  label: "Write" },
-  edit_file:    { icon: "\u270F\uFE0F",  color: C.yellow, label: "Edit" },
-  list_files:   { icon: "\u{1F4C2}", color: C.cyan,   label: "List" },
-  search_files: { icon: "\u{1F50D}", color: C.magenta, label: "Search" },
-  run_command:  { icon: "\u26A1",  color: C.orange,  label: "Run" },
-  browse_page:  { icon: "\u{1F310}", color: C.blue,   label: "Browse" },
-  web_search:   { icon: "\u{1F50E}", color: C.cyan,   label: "Web" },
-  screenshot:   { icon: "\u{1F4F7}", color: C.magenta, label: "Shot" },
+  read_file:    { icon: "read",   color: C.blue,   label: "Read" },
+  write_file:   { icon: "write",  color: C.green,  label: "Write" },
+  edit_file:    { icon: "edit",   color: C.yellow, label: "Edit" },
+  list_files:   { icon: "list",   color: C.cyan,   label: "List" },
+  search_files: { icon: "search", color: C.magenta, label: "Search" },
+  run_command:  { icon: "run",    color: C.orange,  label: "Run" },
+  browse_page:  { icon: "browse", color: C.blue,   label: "Browse" },
+  web_search:   { icon: "web",    color: C.cyan,   label: "Web" },
+  screenshot:   { icon: "shot",   color: C.magenta, label: "Shot" },
 };
 
 const COMMANDS = [
@@ -88,154 +97,28 @@ const COMMANDS = [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const visibleLen = (s) => ("" + s).replace(/\x1b\[[0-9;]*m/g, "").length;
 
-// ── Boot animation — premium experience ─────────────────────
-// Bordered window + typewriter logo + system info +
-// multi-step progress with checkmarks + smooth fade
+// ── Boot: splash statis singkat (profesional, tanpa animasi berlapis).
+// Dihormati juga CUTAD_NO_ANIMATION / CUTAD_REDUCED_MOTION / TERM=dumb:
+// tampil sebaris lalu langsung masuk aplikasi.
 async function bootSequence(stdout, W, H) {
   stdout.write(A.altEnter + A.hideCursor + A.home + A.clearBelow);
-
-  // ── Window dimensions ──
-  const winW = Math.min(52, W - 4);
-  const winH = 14;
+  const title = "aicutad-cli";
+  const meta = `v${VERSION} - Node ${process.version.replace("v", "")} - ${process.platform}/${process.arch}`;
+  if (isReducedMotion() || W < 44 || H < 10) {
+    stdout.write(A.move(1, 1) + C.bold(C.cyan(title)) + "  " + C.dim(meta) + A.clearEOL);
+    return;
+  }
+  const winW = Math.min(56, W - 4);
   const winX = Math.max(1, Math.floor((W - winW) / 2));
-  const winY = Math.max(1, Math.floor((H - winH) / 2));
-
-  // ── Draw bordered window (animated border draw) ──
-  const borderChar = "\u2500";
-  const cornerTL = "\u250F";
-  const cornerTR = "\u2513";
-  const cornerBL = "\u2517";
-  const cornerBR = "\u251B";
-  const sideV = "\u2502";
-
-  // Top border — draw left to right
-  stdout.write(A.move(winY, winX) + C.gray(cornerTL));
-  for (let i = 1; i < winW - 1; i++) {
-    await sleep(6);
-    stdout.write(A.move(winY, winX + i) + C.teal(borderChar));
-  }
-  stdout.write(A.move(winY, winX + winW - 1) + C.gray(cornerTR));
-
-  // Side borders — draw top to bottom
-  for (let r = 1; r < winH - 1; r++) {
-    stdout.write(A.move(winY + r, winX) + C.gray(sideV));
-    stdout.write(A.move(winY + r, winX + winW - 1) + C.gray(sideV));
-    await sleep(8);
-  }
-
-  // Bottom border — draw left to right
-  stdout.write(A.move(winY + winH - 1, winX) + C.gray(cornerBL));
-  for (let i = 1; i < winW - 1; i++) {
-    stdout.write(A.move(winY + winH - 1, winX + i) + C.teal(borderChar));
-    await sleep(6);
-  }
-  stdout.write(A.move(winY + winH - 1, winX + winW - 1) + C.gray(cornerBR));
-
-  await sleep(100);
-
-  // ── Typewriter logo ──
-  const logoText = "aicutad-cli";
-  const logoRow = winY + 2;
-  const logoCol = winX + Math.floor((winW - logoText.length) / 2);
-
-  // Clear logo area then typewriter
-  stdout.write(A.move(logoRow, logoCol) + " ".repeat(logoText.length));
-  await sleep(100);
-  for (let i = 0; i < logoText.length; i++) {
-    const ch = logoText[i];
-    stdout.write(A.move(logoRow, logoCol + i) + C.bold(C.cyan(ch)));
-    await sleep(35);
-  }
-
-  // Subtitle
-  const subText = "AI Coding Agent CLI";
-  const subCol = winX + Math.floor((winW - subText.length) / 2);
-  stdout.write(A.move(logoRow + 1, subCol) + C.dim(subText));
-  await sleep(150);
-
-  // Version badge
-  const verText = `v${VERSION}`;
-  const verCol = winX + Math.floor((winW - verText.length) / 2);
-  stdout.write(A.move(logoRow + 2, verCol) + C.gray(verText));
-  await sleep(200);
-
-  // ── System info line ──
-  const sysInfo = "Node " + process.version.replace("v", "") + "  \u00B7  " +
-                  process.platform + " " + process.arch + "  \u00B7  " +
-                  (process.env.TERM || "terminal");
-  const sysCol = winX + Math.floor((winW - sysInfo.length) / 2);
-  stdout.write(A.move(logoRow + 4, sysCol) + C.gray(sysInfo));
-  await sleep(150);
-
-  // ── Separator line inside window ──
-  const sepRow = logoRow + 5;
-  stdout.write(A.move(sepRow, winX + 1) + C.gray("\u2504".repeat(winW - 2)));
-  await sleep(100);
-
-  // ── Multi-step progress with checkmarks ──
-  const steps = [
-    "Menghubungkan ke gateway",
-    "Memuat model AI",
-    "Menyiapkan agent tools",
-    "Inisialisasi interface",
-  ];
-
-  const stepsStartRow = sepRow + 1;
-  const barW = Math.min(30, winW - 14);
-  const barRow = stepsStartRow + steps.length + 1;
-  const barCol = winX + Math.floor((winW - barW - 8) / 2);
-
-  for (let s = 0; s < steps.length; s++) {
-    const row = stepsStartRow + s;
-    const indent = winX + 3;
-
-    // Show step with pending spinner
-    const stepLabel = steps[s];
-    stdout.write(A.move(row, indent) + C.gray("\u25CB") + " " + C.dim(stepLabel) + A.clearEOL);
-
-    // Mini spinner for this step
-    const miniFrames = ["\u280B", "\u2819", "\u2839", "\u2878"];
-    for (let f = 0; f < 4; f++) {
-      stdout.write(A.move(row, indent) + C.cyan(miniFrames[f]) + " " + C.dim(stepLabel));
-      await sleep(50);
-    }
-
-    // Complete: replace spinner with checkmark
-    stdout.write(A.move(row, indent) + C.green("\u2713") + " " + C.dim(stepLabel));
-
-    // Update progress bar
-    const progress = Math.round(((s + 1) / steps.length) * 100);
-    const filled = Math.floor((progress / 100) * barW);
-    const bar = C.teal("\u2588".repeat(filled)) + C.gray("\u2592".repeat(barW - filled));
-    const pct = String(progress).padStart(3) + "%";
-    stdout.write(A.move(barRow, barCol) + C.gray("[") + bar + C.gray("] ") + C.bold(C.teal(pct)));
-
-    await sleep(80);
-  }
-
-  // ── Final flash ──
-  await sleep(200);
-  // Flash the logo bright
-  stdout.write(A.move(logoRow, logoCol) + C.bold(C.cyan(logoText)));
-  await sleep(150);
-
-  // "Ready" badge
-  const readyText = "READY";
-  const readyCol = winX + Math.floor((winW - readyText.length) / 2);
-  stdout.write(A.move(barRow + 1, readyCol) + C.bold(C.green(readyText)));
-  await sleep(300);
-
-  // Fade out — clear from outside in
-  for (let r = 0; r < Math.ceil(winH / 2); r++) {
-    if (winY + r < winY + winH - 1 - r) {
-      stdout.write(A.move(winY + r, winX) + " ".repeat(winW) + A.clearEOL);
-      stdout.write(A.move(winY + winH - 1 - r, winX) + " ".repeat(winW) + A.clearEOL);
-    } else if (winY + r === winY + winH - 1 - r) {
-      stdout.write(A.move(winY + r, winX) + " ".repeat(winW) + A.clearEOL);
-    }
-    await sleep(20);
-  }
-
+  const winY = Math.max(1, Math.floor(H / 2) - 3);
+  const line = (row, text) => stdout.write(A.move(row, winX) + text + A.clearEOL);
+  line(winY, C.gray("-".repeat(winW)));
+  line(winY + 1, C.bold(C.cyan(title)));
+  line(winY + 2, C.dim("AI Coding Agent CLI"));
+  line(winY + 3, C.dim(truncateText(meta, winW)));
+  line(winY + 4, C.gray("-".repeat(winW)));
+  // Jeda sangat singkat agar splash terbaca; bukan animasi.
+  await sleep(120);
   stdout.write(A.home + A.clearBelow);
 }
 
@@ -443,6 +326,7 @@ export async function startTUI(config) {
   function doRender() {
     const W = stdout.columns || 80;
     const H = stdout.rows || 24;
+    const layout = getLayout(W, H);
 
     if (W < 40 || H < 8) {
       stdout.write(A.home + A.clearBelow);
@@ -457,12 +341,14 @@ export async function startTUI(config) {
     const clock = String(now.getHours()).padStart(2, "0") + ":" +
                   String(now.getMinutes()).padStart(2, "0") + ":" +
                   String(now.getSeconds()).padStart(2, "0");
-    const headerLeft = " " + C.bold(C.cyan("aicutad-cli")) +
-                       " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray(`v${VERSION}`);
-    const headerRight = C.dim(clock);
+    const headerLeft = layout.compact
+      ? " " + C.bold(C.cyan("aicutad-cli")) + " " + C.gray(`v${VERSION}`)
+      : " " + C.bold(C.cyan("aicutad-cli")) +
+        " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray(`v${VERSION}`);
+    const headerRight = layout.showClock ? C.dim(clock) : "";
     const headerPad = Math.max(1, W - visibleLen(headerLeft) - visibleLen(headerRight) - 1);
-    lines.push(headerLeft + " ".repeat(headerPad) + headerRight);
-    lines.push(C.gray("\u2501".repeat(W)));
+    lines.push(headerLeft + (headerRight ? " ".repeat(headerPad) + headerRight : ""));
+    lines.push(C.gray("-".repeat(W)));
 
     // ── Messages area ──
     const footerH = 3; // separator + status + input
@@ -507,22 +393,21 @@ export async function startTUI(config) {
     }
 
     // ── Separator ──
-    lines.push(C.gray("\u2501".repeat(W)));
+    lines.push(C.gray("-".repeat(W)));
 
     // ── Status bar ──
     const sIcon = loading ? C.bYellow("\u25CF") : status === "error" ? C.bRed("\u25CF") : C.bGreen("\u25CF");
     const sLabel = loading ? C.bYellow("bekerja") : status === "error" ? C.bRed("error") : (scrollOffset > 0 ? C.bBlue("scroll " + scrollOffset) : C.bGreen("ready"));
     const msgCount = messages.length + " pesan";
     const provider = config.provider || "cutad";
-    const maxModelLen = W - 52;
-    const modelDisplay = visibleLen(model) > maxModelLen ? model.slice(0, maxModelLen - 1) + "\u2026" : model;
+    const modelDisplay = truncateText(model, layout.modelMaxLength);
 
     // Build status segments
     let statusLine = " " + sIcon + " " + C.gray("\u2502") + " " + sLabel + " " + C.gray("\u2502") +
                      " " + C.bold(modelDisplay) + " " + C.gray("\u2502") + " " + C.dim(msgCount);
 
     // Cost segment — tampilkan tokens + biaya (selalu jika ada costInfo)
-    if (costInfo) {
+    if (costInfo && !layout.veryNarrow) {
       const costStr = C.dim(formatTokens(costInfo.totalTokens) + " tok") + " " + C.gray("\u2502") + " " + C.dim(costInfo.costFormatted);
       statusLine += " " + C.gray("\u2502") + " " + costStr;
     }
@@ -533,10 +418,14 @@ export async function startTUI(config) {
       statusLine += " " + C.gray("\u2502") + " " + ctxColor("ctx " + ctxPercent + "%");
     }
 
-    statusLine += " " + C.gray("\u2502") + " " + C.dim(provider);
-    const hint = C.dim("/help");
-    const hintPad = Math.max(1, W - visibleLen(statusLine) - visibleLen(hint) - 1);
-    lines.push(statusLine + " ".repeat(hintPad) + hint);
+    if (!layout.compact) statusLine += " " + C.gray("\u2502") + " " + C.dim(provider);
+    if (layout.showHints) {
+      const hint = C.dim("/help untuk bantuan");
+      const hintPad = Math.max(1, W - visibleLen(statusLine) - visibleLen(hint) - 1);
+      lines.push(statusLine + " ".repeat(hintPad) + hint);
+    } else {
+      lines.push(truncateText(statusLine, W));
+    }
 
     // ── Input line ──
     const prompt = " " + C.bold(C.cyan("you \u203A")) + " ";
@@ -648,13 +537,13 @@ export async function startTUI(config) {
       }
       out.push(" " + C.bGreen("\u2514\u2500"));
     } else if (msg.role === "tool_call") {
-      const style = TOOL_STYLE[msg.toolName] || { icon: "\u{1F527}", color: C.yellow, label: msg.toolName };
+      const style = TOOL_STYLE[msg.toolName] || { icon: "tool", color: C.yellow, label: msg.toolName };
       const argStr = msg.argsPreview || "";
       const maxArg = W - 25;
       const argDisplay = visibleLen(argStr) > maxArg ? argStr.slice(0, maxArg - 1) + "\u2026" : argStr;
       out.push(" " + style.icon + " " + C.bold(style.color(style.label)) + " " + C.gray(argDisplay) + " " + C.dim("\u2026"));
     } else if (msg.role === "tool_result") {
-      const style = TOOL_STYLE[msg.toolName] || { icon: "\u{1F527}", color: C.green, label: msg.toolName };
+      const style = TOOL_STYLE[msg.toolName] || { icon: "tool", color: C.green, label: msg.toolName };
       const preview = msg.preview || "";
       const maxPrev = W - 22;
       const wrapped = wrapText(preview, Math.min(maxPrev, W - 5));
@@ -851,7 +740,7 @@ export async function startTUI(config) {
 
     // Calculate modal dimensions
     const contentW = Math.max(...modalLines.map((l) => visibleLen(l)), visibleLen(title) + 4, 30);
-    const modalW = Math.min(contentW + 4, W - 4);
+    const modalW = Math.min(contentW + 4, getLayout(W, H).modalWidth);
     const modalH = modalLines.length + 4; // border top + title + separator + content + border bottom
     const modalX = Math.floor((W - modalW) / 2);
     const modalY = Math.floor((H - modalH) / 2);

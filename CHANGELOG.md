@@ -66,6 +66,17 @@ Rilis stabilisasi & hardening besar-besaran.
   - Proxy corporate `HTTP(S)_PROXY`/`NO_PROXY` via undici.
 - **Governance & release**: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SUPPORT.md`, template issue/PR, publish npm dengan `--provenance` dan gerbang kualitas penuh sebelum rilis.
 
+### Fase 7 — UI/UX corporate profesional
+
+- Design system terminal (`src/tui/layout.mjs`): satu aksen warna, label teks (bukan emoji), keputusan layout responsif terpusat dan teruji.
+- Menghormati `NO_COLOR`, `TERM=dumb`, `CUTAD_NO_ANIMATION`/`CUTAD_REDUCED_MOTION` di seluruh UI (termasuk palet TUI yang sebelumnya hardcode).
+- Boot TUI diganti dari animasi berlapis (typewriter/progress/fade ±2 detik) menjadi splash statis singkat (~120ms).
+- TUI responsif: mode compact untuk terminal <72 kolom (header ringkas, status dipangkas aman, modal selalu muat), pesan terminal terlalu kecil tetap jelas.
+- Ikon emoji tool di TUI & CLI agent diganti label teks (`read/write/edit/run/...`).
+- CLI UX: `--help` berisi contoh & environment, keluaran `--json` untuk `status`, `models`, `sessions`, `mcp`, `audit` (termasuk bentuk error JSON), cocok untuk skrip/CI.
+- README & komentar kode dibersihkan dari bahasa marketing ("premium/immersive") menjadi deskripsi faktual.
+- Terverifikasi dengan snapshot PTY pada 100, 48, dan 30 kolom: header tampil, 0 emoji, tidak ada kata "premium".
+
 ## 0.4.8
 
 - Rilis sebelumnya (lihat riwayat git).

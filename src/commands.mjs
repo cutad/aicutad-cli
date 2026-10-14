@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// Command utama: login (wizard premium), status, logout
+// Command utama: login (wizard), status, logout
 // First-run experience: animated boot → step-by-step setup → TUI
 // ─────────────────────────────────────────────────────────────
 import {
@@ -92,7 +92,7 @@ function visibleLen(str) {
 }
 
 /**
- * Wizard setup first-run — premium experience.
+ * Wizard setup first-run.
  * Step 1: API key (hidden input, masked)
  * Step 2: Validate key (animated spinner)
  * Step 3: Pick model (arrow-key selector)
@@ -220,6 +220,18 @@ async function pickModel(models, envModel) {
 export async function status(argv = []) {
   const auth = readAuth();
   const { BASE_URL } = resolveBase(argv);
+  if (argv.includes("--json")) {
+    const base = auth.baseUrl || BASE_URL;
+    if (!isAuthenticated()) {
+      console.log(JSON.stringify({ authenticated: false, baseUrl: base, model: null, models: [] }, null, 2));
+      return;
+    }
+    let models = [];
+    let reachable = true;
+    try { models = await listModels(base, auth.apiKey); } catch { reachable = false; }
+    console.log(JSON.stringify({ authenticated: true, reachable, baseUrl: base, model: auth.model || null, modelCount: models.length, models: models.map((m) => m.id) }, null, 2));
+    return;
+  }
 
   console.log(`\n${banner()}\n  ${subtitle()}\n${rule()}\n`);
 
