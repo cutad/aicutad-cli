@@ -1,9 +1,26 @@
-// Konstanta global untuk Cutad CLI
+// ─────────────────────────────────────────────────────────────
+// Konfigurasi enterprise:
+// - Profile: CUTAD_PROFILE=<name> memisahkan config ke
+//   ~/.cutad/profiles/<name>/ (tanpa profile: ~/.cutad/).
+//   Cocok untuk memisahkan kredensial kerja vs pribadi/corporate.
+// - Semua modul membaca CONFIG_DIR dari sini, jadi profile berlaku
+//   konsisten untuk auth, sesi, checkpoint, audit log, dan policy.
+// ─────────────────────────────────────────────────────────────
 import os from "node:os";
 import path from "node:path";
 
-// Direktori konfigurasi default: ~/.cutad
-export const CONFIG_DIR = path.join(os.homedir(), ".cutad");
+function sanitizeProfile(name) {
+  return String(name || "").replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+export const PROFILE = sanitizeProfile(process.env.CUTAD_PROFILE);
+
+const BASE_DIR = path.join(os.homedir(), ".cutad");
+
+// Direktori konfigurasi aktif (memperhitungkan profile)
+export const CONFIG_DIR = PROFILE
+  ? path.join(BASE_DIR, "profiles", PROFILE)
+  : BASE_DIR;
 
 // File yang menyimpan auth (apiKey + baseUrl)
 export const AUTH_FILE = path.join(CONFIG_DIR, "auth.json");

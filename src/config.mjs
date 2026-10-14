@@ -1,6 +1,5 @@
 // Load / simpan konfigurasi auth untuk Cutad CLI
 import fs from "node:fs";
-import path from "node:path";
 import { AUTH_FILE, CONFIG_DIR, DEFAULT_BASE_URL, DEFAULT_SITE } from "./constants.mjs";
 import { atomicWriteFileSync } from "./fs-utils.mjs";
 

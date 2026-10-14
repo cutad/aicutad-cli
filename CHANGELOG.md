@@ -51,8 +51,20 @@ Rilis stabilisasi & hardening besar-besaran.
 
 ### Pengujian & CI
 
-- Test suite beneran di `test/` (45 test: executor, agent loop dengan mock gateway, config, session/MCP/provider, reliability, Fase 5) dijalankan via `npm test`.
+- Test suite beneran di `test/` (59 test: executor, agent loop, config, session/MCP/provider, reliability, Fase 5, e2e, enterprise) dijalankan via `npm test`.
 - CI sekarang memakai `npm ci` (gagal bila lockfile tidak sinkron) dan menjalankan test di Node 22 & 24.
+
+### Fase 6 — Corporate / enterprise grade
+
+- **Security & compliance**: `SECURITY.md` (kebijakan pelaporan + versi didukung), workflow CodeQL, Dependabot (npm + Actions), secret scanning (gitleaks), gate `npm audit` di CI, SBOM CycloneDX (`npm run sbom`, di-upload sebagai artefak CI & rilis).
+- **Engineering quality**: ESLint flat config sebagai gate CI (23 temuan awal dibersihkan), coverage gate (~78% baris), test e2e CLI, perintah tidak dikenal sekarang error exit 1 (sebelumnya membuka TUI diam-diam).
+- **Enterprise features**:
+  - Profile config: `CUTAD_PROFILE=<name>` memisahkan config ke `~/.cutad/profiles/<name>/`.
+  - Policy tool governance: `.aicutad/policy.json` / `~/.cutad/policy.json` dengan `allowedTools`, `deniedTools`, `workspaceOnly`.
+  - Audit log JSONL `~/.cutad/audit.log` (`0600`, tanpa isi file/API key) + perintah `aicutad audit`.
+  - Telemetry privacy-first: mati secara default, opt-in eksplisit, hanya metadata.
+  - Proxy corporate `HTTP(S)_PROXY`/`NO_PROXY` via undici.
+- **Governance & release**: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SUPPORT.md`, template issue/PR, publish npm dengan `--provenance` dan gerbang kualitas penuh sebelum rilis.
 
 ## 0.4.8
 

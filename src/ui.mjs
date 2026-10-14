@@ -60,7 +60,7 @@ export function panel(title, bodyLines, opts = {}) {
 }
 
 /** Potong string agar tidak melebihi lebar karakter terlihat (tambahkan …). */
-function truncate(str, max, removeAnsiPreserving = true) {
+function truncate(str, max) {
   const s = "" + str;
   if (visibleLen(s) <= max) return s;
   const plain = s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -97,11 +97,8 @@ export function spinner(label) {
     console.log(`${pc.dim(clean)}\n`);
     return async () => "";
   }
-  const frames = ["•", "•", "•"];
-  let i = 0;
   const timer = setInterval(() => {
     process.stdout.write(`\r  ${pc.cyan("·")} ${clean}`);
-    i++;
   }, 100);
   const done = () => new Promise((res) => {
     clearInterval(timer);

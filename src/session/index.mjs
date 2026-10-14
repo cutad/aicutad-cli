@@ -4,7 +4,6 @@
 // ─────────────────────────────────────────────────────────────
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { CONFIG_DIR } from "../constants.mjs";
 import { atomicWriteFileSync } from "../fs-utils.mjs";
 

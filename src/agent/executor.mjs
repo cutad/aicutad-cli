@@ -7,6 +7,8 @@ import { spawnSync } from "node:child_process";
 import { browsePage, searchWeb, screenshotPage } from "./browser.mjs";
 import { atomicWriteFileSync, sha256Short, isBinaryBuffer } from "../fs-utils.mjs";
 import { snapshotBeforeWrite } from "./checkpoint.mjs";
+import { loadPolicy, checkToolPolicy } from "../policy.mjs";
+import { logToolAudit } from "../audit-log.mjs";
 
 const MAX_OUTPUT = 50000; // batas output per tool
 
@@ -44,39 +46,46 @@ function need(args, field, type = "string") {
 }
 
 export async function executeTool(name, args, cwd = process.cwd(), opts = {}) {
-  if (!args || typeof args !== "object") return `Error: argumen tool "${name}" tidak valid (bukan object).`;
-  if (args._parse_error) return `Error: argumen tool "${name}" bukan JSON valid: ${args._parse_error}. Panggil ulang dengan JSON yang benar.`;
+  const started = Date.now();
+  const finish = (result) => {
+    logToolAudit({ name, args: args || {}, cwd, ok: !(typeof result === "string" && result.startsWith("Error")), durationMs: Date.now() - started });
+    return result;
+  };
+  if (!args || typeof args !== "object") return finish(`Error: argumen tool "${name}" tidak valid (bukan object).`);
+  if (args._parse_error) return finish(`Error: argumen tool "${name}" bukan JSON valid: ${args._parse_error}. Panggil ulang dengan JSON yang benar.`);
+  const policyError = checkToolPolicy(opts.policy ?? loadPolicy(cwd), name, args, cwd);
+  if (policyError) return finish(policyError);
   try {
     switch (name) {
       case "read_file": {
-        const e = need(args, "path"); if (e) return e;
-        return readFile(args, cwd);
+        const e = need(args, "path"); if (e) return finish(e);
+        return finish(readFile(args, cwd));
       }
       case "write_file": {
-        const e = need(args, "path") || (typeof args.content !== "string" ? 'Error: argumen "content" wajib berupa string (boleh kosong, tapi harus ada).' : null); if (e) return e;
-        return writeFile(args.path, args.content, cwd, opts);
+        const e = need(args, "path") || (typeof args.content !== "string" ? 'Error: argumen "content" wajib berupa string (boleh kosong, tapi harus ada).' : null); if (e) return finish(e);
+        return finish(writeFile(args.path, args.content, cwd, opts));
       }
       case "edit_file": {
-        const e = need(args, "path") || need(args, "old_string") || (typeof args.new_string !== "string" ? 'Error: argumen "new_string" wajib berupa string.' : null); if (e) return e;
-        return editFile(args.path, args.old_string, args.new_string, cwd, opts);
+        const e = need(args, "path") || need(args, "old_string") || (typeof args.new_string !== "string" ? 'Error: argumen "new_string" wajib berupa string.' : null); if (e) return finish(e);
+        return finish(editFile(args.path, args.old_string, args.new_string, cwd, opts));
       }
       case "list_files":
-        return listFiles(args.path || cwd, cwd);
+        return finish(listFiles(args.path || cwd, cwd));
       case "search_files":
-        return searchFiles(args.pattern, args.path || cwd, cwd);
+        return finish(searchFiles(args.pattern, args.path || cwd, cwd));
       case "run_command":
-        return runCommand(args.command, cwd, opts);
+        return finish(runCommand(args.command, cwd, opts));
       case "browse_page":
-        return await browsePage(args.url, { wait: args.wait });
+        return finish(await browsePage(args.url, { wait: args.wait }));
       case "web_search":
-        return await searchWeb(args.query);
+        return finish(await searchWeb(args.query));
       case "screenshot":
-        return await screenshotPage(args.url, { fullPage: args.full_page });
+        return finish(await screenshotPage(args.url, { fullPage: args.full_page }));
       default:
-        return `Error: tool "${name}" tidak dikenal.`;
+        return finish(`Error: tool "${name}" tidak dikenal.`);
     }
   } catch (e) {
-    return `Error: ${e.message}`;
+    return finish(`Error: ${e.message}`);
   }
 }
 

@@ -18,6 +18,8 @@ import { closeBrowser } from "./browser.mjs";
 import { withRetry } from "../retry.mjs";
 import { buildApprovalPreview } from "./diff.mjs";
 import { createCheckpoint } from "./checkpoint.mjs";
+import { loadPolicy } from "../policy.mjs";
+import { trackEvent } from "../telemetry.mjs";
 
 const MAX_ITERATIONS = 20;
 const AGENT_SYSTEM_PROMPT = `Kamu adalah aicutad-cli, agent coding otonom.
@@ -169,7 +171,7 @@ export async function runAgentLoop({
           }
         }
 
-        const result = await executeTool(funcName, args, workDir, { checkpoint: activeCheckpoint });
+        const result = await executeTool(funcName, args, workDir, { checkpoint: activeCheckpoint, policy: loadPolicy(workDir) });
 
         onToolResult?.(funcName, result);
 
@@ -199,6 +201,7 @@ export async function runAgentLoop({
     finalResult += "\n\n(Berhenti setelah 20 iterasi — batas aman.)";
   }
 
+  trackEvent("agent_loop_complete", { iterations, toolCalls: toolCallCount, totalTokens: costTracker.totalTokens });
   return {
     result: finalResult,
     iterations,
@@ -261,7 +264,7 @@ async function callModelWithTools(baseUrl, apiKey, model, messages) {
     } catch {}
 
     // Ekstrak JSON seimbang
-    let start = text.indexOf("{");
+    const start = text.indexOf("{");
     if (start === -1) throw new Error("Respons bukan JSON");
     let depth = 0;
     let inStr = false;

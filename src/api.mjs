@@ -1,6 +1,6 @@
 // Lapisan komunikasi dengan gateway OpenAI-compatible (cutad.web.id)
 import { authHeaders } from "./config.mjs";
-import { withRetry, isTransientError } from "./retry.mjs";
+import { withRetry } from "./retry.mjs";
 import { REQUEST_TIMEOUT_MS } from "./constants.mjs";
 
 /**

@@ -1,7 +1,7 @@
 // Tampilkan daftar model dari gateway
 import { readAuth, resolveBase } from "./config.mjs";
 import { listModels } from "./api.mjs";
-import { banner, subtitle, rule, panel, row, ok, fail, spinner, cmd, pc } from "./ui.mjs";
+import { banner, subtitle, rule, panel, ok, fail, spinner, cmd, pc } from "./ui.mjs";
 
 export async function models(argv = []) {
   const auth = readAuth();

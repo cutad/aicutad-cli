@@ -11,7 +11,6 @@
 //    - Summarize sisanya jadi 1 pesan "ringkasan"
 // 3. Gateway dipangai untuk summarization (model sendiri)
 // ─────────────────────────────────────────────────────────────
-import os from "node:os";
 
 const DEFAULT_CONTEXT_WINDOW = 128000;
 const SUMMARIZE_THRESHOLD = 0.8; // 80% dari context window
@@ -61,7 +60,7 @@ export function needsSummarize(messages, contextWindow = DEFAULT_CONTEXT_WINDOW)
  * @returns {Promise<Array>} messages baru dengan ringkasan
  */
 export async function summarizeContext(messages, opts = {}) {
-  const { baseUrl, apiKey, model, contextWindow = DEFAULT_CONTEXT_WINDOW } = opts;
+  const { baseUrl, apiKey, model } = opts;
 
   if (messages.length <= KEEP_RECENT + 1) return messages; // +1 for system
 

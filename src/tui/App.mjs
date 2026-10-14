@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────
 import { chatCompletion, listModels } from "../api.mjs";
 import { listAgents } from "../agent/index.mjs";
-import { listSessions, saveSession, appendMessage, createSession } from "../session/index.mjs";
+import { listSessions, saveSession, appendMessage } from "../session/index.mjs";
 import { formatTokens } from "../agent/cost.mjs";
 import { estimateMessageTokens } from "../agent/context.mjs";
 import { VERSION } from "../version.mjs";
@@ -109,7 +109,6 @@ async function bootSequence(stdout, W, H) {
   const sideV = "\u2502";
 
   // Top border — draw left to right
-  let topLine = cornerTL;
   stdout.write(A.move(winY, winX) + C.gray(cornerTL));
   for (let i = 1; i < winW - 1; i++) {
     await sleep(6);
@@ -275,7 +274,7 @@ export async function startTUI(config) {
   let prevLineCount = 0;
   let booting = true;
   let modal = null; // { type, items, selected, scroll, state }
-  let inputHistory = [];
+  const inputHistory = [];
   let historyIdx = -1;
   let typingActive = false;
   let scrollOffset = 0;  // scroll up/down messages (0 = bottom/latest)
@@ -299,14 +298,7 @@ export async function startTUI(config) {
   // Ini eliminasi glitch/flicker saat idle, loading, dan typing.
 
   // Track layout positions for in-place updates
-  let layoutInfo = { spinnerRow: 0, clockRow: 1, clockCol: 1, inputRow: 0, inputCol: 1, statusRow: 0 };
-
-  function startSpinner() {
-    if (spinnerTimer) return;
-    // Full render sekali untuk setup layout, lalu in-place updates
-    render();
-    startSpinnerNoRender();
-  }
+  const layoutInfo = { spinnerRow: 0, clockRow: 1, clockCol: 1, inputRow: 0, inputCol: 1, statusRow: 0 };
 
   function startSpinnerNoRender() {
     if (spinnerTimer) return;
@@ -494,7 +486,6 @@ export async function startTUI(config) {
 
     // ── Spinner / loading indicator ──
     // Simpan baris spinner untuk updateSpinnerInPlace
-    const spinnerLineIdx = lines.length; // next line will be spinner (or padding)
     if (loading) {
       const frame = SPINNER[spinnerIdx];
       let statusText = "menunggu respons";
@@ -800,7 +791,7 @@ export async function startTUI(config) {
 
   // ── Modal overlay ──────────────────────────────────────────
   function buildModalOverlay(m, W, H) {
-    let modalLines = [];
+    const modalLines = [];
     let title = "";
 
     if (m.type === "help") {
@@ -1363,7 +1354,7 @@ async function fallbackREPL(config) {
   const { createInterface } = await import("node:readline");
   const pc = (await import("picocolors")).default;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  let messages = Array.isArray(config.session?.messages)
+  const messages = Array.isArray(config.session?.messages)
     ? config.session.messages.filter((m) => m && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: m.content }))
     : [];
 

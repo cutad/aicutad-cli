@@ -1,4 +1,4 @@
-import { test, before } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -78,7 +78,7 @@ async function mockServer(handler) {
   return { server, url: `http://127.0.0.1:${server.address().port}` };
 }
 
-function toolCallServer(dir) {
+function toolCallServer(_dir) {
   let call = 0;
   return mockServer((req, res) => {
     let b = "";

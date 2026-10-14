@@ -277,6 +277,39 @@ Disimpan di `~/.cutad/`:
 CUTAD_API_KEY=cag_... CUTAD_MODEL=deepseek-ai/deepseek-v4-pro aicutad login
 ```
 
+## Enterprise / Corporate
+
+Fitur untuk lingkungan organisasi & compliance:
+
+**Profile terpisah** — pisahkan kredensial per lingkungan:
+
+```bash
+CUTAD_PROFILE=corp aicutad login     # config di ~/.cutad/profiles/corp/
+CUTAD_PROFILE=corp aicutad agent "..."
+```
+
+**Policy (tool governance)** — batasi kemampuan agent lewat
+`.aicutad/policy.json` di proyek atau `~/.cutad/policy.json`:
+
+```json
+{
+  "workspaceOnly": true,
+  "allowedTools": ["read_file", "write_file", "edit_file", "list_files", "search_files"],
+  "deniedTools": ["run_command"]
+}
+```
+
+**Audit log** — semua eksekusi tool tercatat JSONL di `~/.cutad/audit.log`
+(tanpa isi file/API key). Lihat dengan `aicutad audit --limit 20`,
+matikan dengan `CUTAD_AUDIT_LOG=0`.
+
+**Lainnya:**
+
+- Proxy corporate: `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` dihormati otomatis
+- Telemetry: mati secara default; opt-in `CUTAD_TELEMETRY=1` + `CUTAD_TELEMETRY_URL` (hanya metadata, tanpa prompt/konten)
+- Command destruktif diblokir default; override sadar: `CUTAD_ALLOW_DESTRUCTIVE=1`
+- SBOM CycloneDX: `npm run sbom` • Keamanan: lihat `SECURITY.md` • Kontribusi: `CONTRIBUTING.md`
+
 ## Struktur Project
 
 ```

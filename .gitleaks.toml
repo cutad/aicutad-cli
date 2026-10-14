@@ -1,0 +1,18 @@
+# Konfigurasi gitleaks: aturan bawaan + allowlist untuk contoh/test.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Contoh dokumentasi & fixture test yang bukan kredensial asli"
+regexes = [
+  '''mock-model''',
+  '''unit-test-key''',
+  '''smoke-key''',
+  '''example\\.test''',
+  '''gw\\.example''',
+]
+paths = [
+  '''test/.*''',
+  '''README\\.md''',
+  '''CHANGELOG\\.md''',
+]

@@ -283,7 +283,7 @@ export async function evalPage(url, jsCode, opts = {}) {
 /**
  * Cari di Google dan return hasil.
  */
-export async function searchWeb(query, opts = {}) {
+export async function searchWeb(query, _opts = {}) {
   const browser = await getBrowser();
   const page = await browser.newPage();
 

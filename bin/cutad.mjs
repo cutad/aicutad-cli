@@ -3,6 +3,9 @@
 import { Command } from "commander";
 import { createRequire } from "node:module";
 import { isAuthenticated } from "../src/config.mjs";
+import { initProxy } from "../src/proxy.mjs";
+
+await initProxy();
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json");
@@ -174,6 +177,17 @@ program
     servers.forEach((s) => console.log(`  ${s.name.padEnd(20)} ${s.command} ${(s.args||[]).join(" ")} ${s.enabled ? "✓" : "✗"}`));
   }));
 
+// │ audit — lihat audit log eksekusi tool (compliance)               │
+program
+  .command("audit")
+  .description("Lihat audit log eksekusi tool (~/.cutad/audit.log)")
+  .option("--limit <n>", "Jumlah entri terakhir", "50")
+  .action((opts) => import("../src/audit-log.mjs").then((m) => {
+    const entries = m.readAuditLog(Number(opts.limit) || 50);
+    if (!entries.length) { console.log("  Audit log kosong."); return; }
+    entries.forEach((e) => console.log(`  ${e.ts}  ${String(e.tool).padEnd(14)} ${e.ok ? "ok " : "ERR"}  ${JSON.stringify(e.args)}`));
+  }));
+
 // │ resume — lanjutkan sesi tersimpan di TUI                         │
 program
   .command("resume <id>")
@@ -224,6 +238,16 @@ program.action(async () => {
     systemPrompt: "Kamu adalah aicutad-cli, asisten AI coding. Jawab ringkas, praktis, sertakan contoh kode bila relevan.",
   });
 });
+
+// Tolak sub-command tidak dikenal secara eksplisit. Tanpa ini,
+// commander meneruskan kata asing ke handler root dan TUI terbuka
+// diam-diam (exit 0) - perilaku yang tidak bisa diterima corporate.
+const KNOWN_COMMANDS = new Set(["login", "status", "logout", "models", "chat", "agents", "agent", "sessions", "mcp", "rollback", "audit", "resume", "help"]);
+const firstArg = process.argv[2];
+if (firstArg && !firstArg.startsWith("-") && !KNOWN_COMMANDS.has(firstArg)) {
+  console.error(`  Error: perintah tidak dikenal: ${firstArg}. Jalankan 'aicutad --help'.`);
+  process.exit(1);
+}
 
 program.parseAsync(process.argv);
 

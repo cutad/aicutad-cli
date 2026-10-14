@@ -7,7 +7,7 @@ import {
 } from "./config.mjs";
 import { listModels } from "./api.mjs";
 import { banner, subtitle, rule, panel, row, ok, fail, info, cmd, pc } from "./ui.mjs";
-import { askHidden, askPlain, select, confirm } from "./prompt.mjs";
+import { askHidden, select, confirm } from "./prompt.mjs";
 import { VERSION } from "./version.mjs";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
