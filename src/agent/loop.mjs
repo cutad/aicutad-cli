@@ -16,6 +16,8 @@ import { needsSummarize, summarizeContext, estimateMessageTokens } from "./conte
 import { createCostTracker, recordCall, getCostSummary, formatCostSummary } from "./cost.mjs";
 import { closeBrowser } from "./browser.mjs";
 import { withRetry } from "../retry.mjs";
+import { buildApprovalPreview } from "./diff.mjs";
+import { createCheckpoint } from "./checkpoint.mjs";
 
 const MAX_ITERATIONS = 20;
 const AGENT_SYSTEM_PROMPT = `Kamu adalah aicutad-cli, agent coding otonom.
@@ -56,15 +58,20 @@ Aturan:
  * @param {function} [opts.onError] - callback saat error
  * @returns {Promise<{result, iterations, toolCalls}>}
  */
+const APPROVAL_TOOLS = new Set(["write_file", "edit_file", "run_command"]);
+
 export async function runAgentLoop({
   baseUrl, apiKey, model, task, cwd,
   onToolCall, onToolResult, onThinking, onError, onCost, onSummarize,
+  onApprove, checkpoint = true,
 }) {
   const workDir = cwd || process.cwd();
   const messages = [
     { role: "system", content: AGENT_SYSTEM_PROMPT + `\n\nWorking directory: ${workDir}\nOS: ${os.platform()} ${os.release()}\n\nKamu juga punya tools browser: browse_page (buka URL & baca teks), web_search (cari di Google), screenshot (ambil screenshot halaman).` },
     { role: "user", content: task },
   ];
+
+  const activeCheckpoint = checkpoint ? createCheckpoint(workDir) : null;
 
   let iterations = 0;
   let toolCallCount = 0;
@@ -149,7 +156,20 @@ export async function runAgentLoop({
 
         onToolCall?.(funcName, args);
 
-        const result = await executeTool(funcName, args, workDir);
+        // Approval gate: untuk tool mutasi, minta persetujuan user dulu
+        // (dengan preview diff/command) bila callback onApprove disediakan.
+        if (onApprove && APPROVAL_TOOLS.has(funcName) && !args._parse_error) {
+          const preview = buildApprovalPreview(funcName, args, workDir);
+          const approved = await onApprove({ name: funcName, args, preview });
+          if (!approved) {
+            const rejected = `Ditolak user: ${funcName} tidak dijalankan. Preview: ${preview.slice(0, 200)}`;
+            onToolResult?.(funcName, rejected);
+            messages.push({ role: "tool", tool_call_id: toolCall.id, content: rejected });
+            continue;
+          }
+        }
+
+        const result = await executeTool(funcName, args, workDir, { checkpoint: activeCheckpoint });
 
         onToolResult?.(funcName, result);
 
@@ -185,6 +205,7 @@ export async function runAgentLoop({
     toolCalls: toolCallCount,
     cost: costTracker,
     costSummary: formatCostSummary(costTracker),
+    checkpointId: activeCheckpoint?.id || null,
   };
   } catch (e) {
     onError?.(e.message);

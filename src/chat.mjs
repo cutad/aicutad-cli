@@ -1,7 +1,7 @@
 // Chat ke gateway + interactive REPL + TUI launcher
 import { createInterface } from "node:readline";
 import { readAuth, resolveBase } from "./config.mjs";
-import { chatCompletion } from "./api.mjs";
+import { chatCompletion, chatCompletionStream } from "./api.mjs";
 import { banner, subtitle, rule, ok, fail, info, arrow, spinner, cmd, pc } from "./ui.mjs";
 
 const SYSTEM_PROMPT = [
@@ -41,10 +41,17 @@ export async function chat(prompt, argv = [], useTui = false) {
   ];
 
   const stop = spinner(`Menunggu respons (${model}) ...`);
+  let firstToken = true;
   try {
-    const content = await chatCompletion({ baseUrl: BASE_URL, apiKey: auth.apiKey, model, messages });
-    await stop();
-    printAnswer(content, model);
+    const content = await chatCompletionStream({
+      baseUrl: BASE_URL, apiKey: auth.apiKey, model, messages,
+      onToken: (tok) => {
+        if (firstToken) { firstToken = false; stop(); process.stdout.write(`\n${"-".repeat(56)}\n`); }
+        process.stdout.write(tok);
+      },
+    });
+    if (firstToken) { await stop(); printAnswer(content, model); }
+    else process.stdout.write(`\n${"-".repeat(56)}  [${model}]\n\n`);
   } catch (e) {
     await stop();
     console.error(`\n  ${fail(e.message)}`);

@@ -77,7 +77,7 @@ test("session: file utama korup -> recovery dari .bak", () => {
   s.messages.push({ role: "user", content: "pesan penting" });
   session.saveSession(s);
   session.saveSession(s); // kedua: .bak dibuat dari versi valid pertama
-  const file = path.join(fakeHome, ".cutad", "sessions", `${s.id}.json`);
+  const file = path.join(session.SESSIONS_DIR, `${s.id}.json`);
   fs.writeFileSync(file, "{korup bukan json");
   const loaded = session.loadSession(s.id);
   assert.ok(loaded, "harus recovery dari backup");
@@ -87,7 +87,7 @@ test("session: file utama korup -> recovery dari .bak", () => {
 test("session: tidak ada temp file tersisa setelah save", () => {
   const s = session.createSession("m-atomic", "cutad");
   session.saveSession(s);
-  const dir = path.join(fakeHome, ".cutad", "sessions");
+  const dir = session.SESSIONS_DIR;
   const leftovers = fs.readdirSync(dir).filter((f) => f.includes(".tmp-"));
   assert.deepEqual(leftovers, []);
 });

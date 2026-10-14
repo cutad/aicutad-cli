@@ -68,13 +68,35 @@ program
   .description("Jalankan agent otonom: baca/tulis file, run command, selesaikan tugas")
   .option("-m, --model <model>", "Model yang dipakai")
   .option("-d, --dir <path>", "Working directory (default: cwd)")
+  .option("-y, --yes", "Setujui semua aksi tanpa prompt approval")
+  .option("--no-checkpoint", "Nonaktifkan checkpoint/rollback untuk sesi ini")
   .action((task, opts) => {
     const taskText = Array.isArray(task) ? task.join(" ") : task;
     return import("../src/agent/run.mjs").then((m) => m.runCliAgent(taskText, {
       model: opts.model,
       cwd: opts.dir,
+      yes: opts.yes,
+      checkpoint: opts.checkpoint,
     }));
   });
+
+// │ rollback — pulihkan file dari checkpoint agent                  │
+program
+  .command("rollback [id]")
+  .description("Pulihkan file dari checkpoint agent (--list untuk daftar)")
+  .option("--list", "Daftar checkpoint tersimpan")
+  .action((id, opts) => import("../src/agent/checkpoint.mjs").then((m) => {
+    if (opts.list || !id) {
+      const list = m.listCheckpoints();
+      if (!list.length) { console.log("  Belum ada checkpoint."); return; }
+      list.forEach((c) => console.log(`  ${c.id}  ${c.files} file  ${c.cwd}  ${c.createdAt}`));
+      return;
+    }
+    const r = m.restoreCheckpoint(id);
+    if (!r.ok) { console.error(`  Error: ${r.error}`); process.exitCode = 1; return; }
+    console.log(`  Rollback selesai: ${r.restored.length} file dipulihkan, ${r.removed.length} file baru dihapus.`);
+    [...r.restored, ...r.removed].forEach((f) => console.log(`   - ${f}`));
+  }));
 
 // │ sessions — daftar session tersimpan                                │
 program
@@ -151,6 +173,32 @@ program
     if (servers.length === 0) { console.log("  Belum ada MCP server."); return; }
     servers.forEach((s) => console.log(`  ${s.name.padEnd(20)} ${s.command} ${(s.args||[]).join(" ")} ${s.enabled ? "✓" : "✗"}`));
   }));
+
+// │ resume — lanjutkan sesi tersimpan di TUI                         │
+program
+  .command("resume <id>")
+  .description("Lanjutkan session tersimpan (TUI dengan riwayat sesi itu)")
+  .action(async (id) => {
+    if (!isAuthenticated()) {
+      const { login } = await import("../src/commands.mjs");
+      return login([]);
+    }
+    const { readAuth, resolveBase } = await import("../src/config.mjs");
+    const { loadSession } = await import("../src/session/index.mjs");
+    const session = loadSession(id);
+    if (!session) { console.error(`  Error: session tidak ditemukan: ${id}`); process.exitCode = 1; return; }
+    const auth = readAuth();
+    const { BASE_URL } = resolveBase([]);
+    const { startTUI } = await import("../src/tui/App.mjs");
+    return startTUI({
+      baseUrl: BASE_URL,
+      apiKey: auth.apiKey,
+      model: session.model || auth.model,
+      provider: session.provider || "cutad",
+      session,
+      systemPrompt: "Kamu adalah aicutad-cli, asisten AI coding. Jawab ringkas, praktis, sertakan contoh kode bila relevan.",
+    });
+  });
 
 // │ Tanpa sub-command:                                                │
 // │ - belum login → wizard                                            │

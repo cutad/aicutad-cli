@@ -16,6 +16,7 @@ import pc from "picocolors";
 import { readAuth, resolveBase } from "../config.mjs";
 import { runAgentLoop } from "./loop.mjs";
 import { VERSION } from "../version.mjs";
+import { createInterface } from "node:readline";
 
 const TOOL_ICON = {
   read_file: "\u{1F4D6}",
@@ -106,7 +107,27 @@ export async function runCliAgent(task, opts = {}) {
   } catch {}
 
   // ── Run agent loop ─────────────────────────────────────────
+  // Approval interaktif (hanya TTY): tampilkan preview diff/command,
+  // user menjawab y / n / a (setujui semua berikutnya). -y menonaktifkan.
+  let approveAll = Boolean(opts.yes);
+  const askApproval = (process.stdin.isTTY && process.stdout.isTTY && !opts.yes)
+    ? async ({ name, preview }) => {
+        if (approveAll) return true;
+        stopSpinner();
+        console.log("\n  " + pc.bold(pc.yellow("Persetujuan diperlukan")) + "  " + pc.dim(name));
+        console.log(preview.split("\n").map((l) => "    " + l).join("\n"));
+        const answer = await new Promise((resolve) => {
+          const rl = createInterface({ input: process.stdin, output: process.stdout });
+          rl.question("  Setujui? (y)es / (n)o / (a)ll  ", (a) => { rl.close(); resolve(String(a || "").trim().toLowerCase()); });
+        });
+        if (answer === "a" || answer === "all") { approveAll = true; return true; }
+        return answer === "y" || answer === "yes";
+      }
+    : undefined;
+
   const result = await runAgentLoop({
+    onApprove: askApproval,
+    checkpoint: opts.checkpoint !== false,
     baseUrl: BASE_URL,
     apiKey: auth.apiKey,
     model,
@@ -159,6 +180,10 @@ export async function runCliAgent(task, opts = {}) {
       appendMessage(cliSession, { role: "assistant", content: result.result || "" });
       console.log("  " + pc.dim(`sesi: ${cliSession.id}`));
     } catch {}
+  }
+
+  if (result.checkpointId) {
+    console.log("  " + pc.dim(`checkpoint: ${result.checkpointId} (rollback: aicutad rollback ${result.checkpointId})`));
   }
 
   // ── Summary ────────────────────────────────────────────────

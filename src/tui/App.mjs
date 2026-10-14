@@ -250,7 +250,13 @@ export async function startTUI(config) {
   }
 
   // ── State ──────────────────────────────────────────────────
-  let messages = [];
+  // Resume: bila session membawa riwayat (dimuat dari disk), pakai itu
+  // sebagai konteks awal. ts string -> Date agar renderer tidak crash.
+  let messages = Array.isArray(config.session?.messages)
+    ? config.session.messages
+        .filter((m) => m && (m.role === "user" || m.role === "assistant"))
+        .map((m) => ({ ...m, ts: m.ts ? new Date(m.ts) : new Date() }))
+    : [];
   let input = "";
   let loading = false;
   let model = config.model || "";
@@ -1357,7 +1363,9 @@ async function fallbackREPL(config) {
   const { createInterface } = await import("node:readline");
   const pc = (await import("picocolors")).default;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  let messages = [];
+  let messages = Array.isArray(config.session?.messages)
+    ? config.session.messages.filter((m) => m && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: m.content }))
+    : [];
 
   console.log("\n" + pc.cyan(pc.bold("aicutad-cli")) + " " + pc.dim("\u2014 Mode non-TUI") + "\n");
 

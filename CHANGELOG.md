@@ -41,9 +41,17 @@ Rilis stabilisasi & hardening besar-besaran.
 - Browser tool memakai Chromium bawaan Puppeteer terlebih dahulu, fallback ke Chromium sistem (Linux/macOS/Windows); `page.waitForTimeout` yang sudah dihapus Puppeteer diganti timer internal.
 - Dependensi diperbarui: Puppeteer 25, MCP SDK 1.32. `npm audit`: **0 vulnerabilities** (sebelumnya 14).
 
+### Fase 5 — kemampuan kelas coding-agent
+
+- **Auto-verifikasi oleh sistem** setelah `write_file`/`edit_file`: `.js/.mjs/.cjs` dicek `node --check`, `.json` di-parse, `.py` dicek `py_compile`. Syntax rusak langsung dilaporkan ke model sebagai error agar diperbaiki di iterasi yang sama — tidak lagi mengandalkan ketelitian model.
+- **Approval + diff preview**: di terminal interaktif, aksi `write_file`/`edit_file`/`run_command` menampilkan preview (diff -/+) dan menunggu persetujuan `y/n/a`. `aicutad agent -y` untuk melewati prompt.
+- **Checkpoint & rollback**: file yang akan diubah disnapshot dulu ke `~/.cutad/checkpoints/`. Pulihkan dengan `aicutad rollback <id>` (`--list` untuk daftar).
+- **Resume sesi**: `aicutad resume <id>` membuka TUI dengan riwayat sesi tersebut sebagai konteks.
+- **Streaming**: `aicutad chat` sekarang men-stream token SSE secara real-time (fallback otomatis bila gateway membalas JSON biasa).
+
 ### Pengujian & CI
 
-- Test suite beneran di `test/` (35 test: executor, agent loop dengan mock gateway, config, session/MCP/provider, reliability) dijalankan via `npm test`.
+- Test suite beneran di `test/` (45 test: executor, agent loop dengan mock gateway, config, session/MCP/provider, reliability, Fase 5) dijalankan via `npm test`.
 - CI sekarang memakai `npm ci` (gagal bila lockfile tidak sinkron) dan menjalankan test di Node 22 & 24.
 
 ## 0.4.8

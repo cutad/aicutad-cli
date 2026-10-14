@@ -6,6 +6,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { browsePage, searchWeb, screenshotPage } from "./browser.mjs";
 import { atomicWriteFileSync, sha256Short, isBinaryBuffer } from "../fs-utils.mjs";
+import { snapshotBeforeWrite } from "./checkpoint.mjs";
 
 const MAX_OUTPUT = 50000; // batas output per tool
 
@@ -53,11 +54,11 @@ export async function executeTool(name, args, cwd = process.cwd(), opts = {}) {
       }
       case "write_file": {
         const e = need(args, "path") || (typeof args.content !== "string" ? 'Error: argumen "content" wajib berupa string (boleh kosong, tapi harus ada).' : null); if (e) return e;
-        return writeFile(args.path, args.content, cwd);
+        return writeFile(args.path, args.content, cwd, opts);
       }
       case "edit_file": {
         const e = need(args, "path") || need(args, "old_string") || (typeof args.new_string !== "string" ? 'Error: argumen "new_string" wajib berupa string.' : null); if (e) return e;
-        return editFile(args.path, args.old_string, args.new_string, cwd);
+        return editFile(args.path, args.old_string, args.new_string, cwd, opts);
       }
       case "list_files":
         return listFiles(args.path || cwd, cwd);
@@ -77,6 +78,36 @@ export async function executeTool(name, args, cwd = process.cwd(), opts = {}) {
   } catch (e) {
     return `Error: ${e.message}`;
   }
+}
+
+// Auto-verifikasi SETELAH tulis oleh SISTEM (bukan mengandalkan model):
+// - .js/.mjs/.cjs  -> node --check
+// - .json          -> JSON.parse
+// - .py            -> python3 -m py_compile (bila python3 ada)
+// Kegagalan dikembalikan sebagai Error di hasil tool agar agent loop
+// memaksa model memperbaikinya di iterasi berikutnya.
+export function verifyWrittenFile(full, content) {
+  const ext = path.extname(full).toLowerCase();
+  try {
+    if ([".js", ".mjs", ".cjs"].includes(ext)) {
+      const r = spawnSync(process.execPath, ["--check", full], { encoding: "utf8", timeout: 15000 });
+      if (r.status !== 0) return `Error verifikasi syntax (node --check): ${(r.stderr || "syntax tidak valid").trim().slice(0, 800)}\nFile sudah ditulis tapi RUSAK secara syntax. Perbaiki sebelum lanjut.`;
+      return "syntax OK (node --check)";
+    }
+    if (ext === ".json") {
+      JSON.parse(content);
+      return "JSON valid";
+    }
+    if (ext === ".py") {
+      const r = spawnSync("python3", ["-m", "py_compile", full], { encoding: "utf8", timeout: 15000 });
+      if (r.error) return null; // python3 tidak ada: lewati diam-diam
+      if (r.status !== 0) return `Error verifikasi syntax (py_compile): ${(r.stderr || "").trim().slice(0, 800)}\nFile sudah ditulis tapi RUSAK secara syntax. Perbaiki sebelum lanjut.`;
+      return "syntax OK (py_compile)";
+    }
+  } catch (e) {
+    return `Error verifikasi: ${e.message}`;
+  }
+  return null;
 }
 
 function truncate(s, max = MAX_OUTPUT) {
@@ -112,10 +143,11 @@ function readFile(args, cwd) {
   return truncate(content);
 }
 
-function writeFile(filePath, content, cwd) {
+function writeFile(filePath, content, cwd, opts = {}) {
   if (typeof content !== "string") return 'Error: argumen "content" wajib berupa string.';
   if (content.includes("\0")) return "Error: content mengandung NUL byte, ditolak.";
   const full = resolvePath(filePath, cwd);
+  snapshotBeforeWrite(opts.checkpoint, full);
   // Tulis ATOMIK (temp + rename): mati di tengah tidak merusak file lama.
   atomicWriteFileSync(full, content, { mode: 0o644, dirMode: 0o755 });
   // Verifikasi read-back: yang di disk harus persis yang diminta model.
@@ -124,21 +156,24 @@ function writeFile(filePath, content, cwd) {
     return `Error: verifikasi gagal untuk ${full} (ditulis ${content.length} chars, terbaca ${back.length} chars). File mungkin tidak utuh, coba lagi.`;
   }
   const lines = content ? content.split("\n").length : 0;
-  return `File ditulis: ${full} (${Buffer.byteLength(content)} bytes, ${lines} baris, sha256:${sha256Short(content)}, terverifikasi)`;
+  const verdict = verifyWrittenFile(full, content);
+  return `File ditulis: ${full} (${Buffer.byteLength(content)} bytes, ${lines} baris, sha256:${sha256Short(content)}, terverifikasi)${verdict ? `\nVerifikasi: ${verdict}` : ""}`;
 }
 
-function editFile(filePath, oldString, newString, cwd) {
+function editFile(filePath, oldString, newString, cwd, opts = {}) {
   const full = resolvePath(filePath, cwd);
   if (!fs.existsSync(full)) return `Error: file tidak ditemukan: ${full}`;
   const content = fs.readFileSync(full, "utf8");
   if (!content.includes(oldString)) return `Error: old_string tidak ditemukan di ${full}`;
+  snapshotBeforeWrite(opts.checkpoint, full);
   const count = content.split(oldString).length - 1;
   if (count > 1) return `Error: old_string muncul ${count}x — harus unique. Beri konteks lebih spesifik.`;
   const updated = content.replace(oldString, newString);
   atomicWriteFileSync(full, updated, { mode: 0o644, dirMode: 0o755 });
   const back = fs.readFileSync(full, "utf8");
   if (back !== updated) return `Error: verifikasi gagal setelah edit ${full}. Coba baca ulang file.`;
-  return `File diedit: ${full} (sha256:${sha256Short(updated)}, terverifikasi)`;
+  const verdict = verifyWrittenFile(full, updated);
+  return `File diedit: ${full} (sha256:${sha256Short(updated)}, terverifikasi)${verdict ? `\nVerifikasi: ${verdict}` : ""}`;
 }
 
 function listFiles(dirPath, cwd) {

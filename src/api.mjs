@@ -103,6 +103,76 @@ export async function listModels(baseUrl, apiKey) {
 }
 
 /**
+ * Chat dengan STREAMING SSE (stream: true).
+ * Token diteruskan ke onToken secepatnya saat tiba; fungsi mengembalikan
+ * teks lengkapnya. Bila gateway membalas JSON biasa (bukan SSE),
+ * parser fallback mengekstrak content seperti biasa.
+ * @param {object} opts {baseUrl, apiKey, model, messages, temperature, max_tokens, onToken}
+ * @returns {Promise<string>}
+ */
+export async function chatCompletionStream(opts) {
+  const { onToken, ...rest } = opts;
+  const { baseUrl, apiKey, model, messages, temperature = 0.7, max_tokens: maxTokens } = rest;
+  const body = { model, messages, temperature, stream: true };
+  if (maxTokens) body.max_tokens = maxTokens;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: authHeaders({ apiKey }),
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Chat gagal (HTTP ${res.status}): ${detail.slice(0, 500)}`);
+    }
+    if (!res.body) throw new Error("Respons streaming tidak memiliki body.");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let full = "";
+    let sawSse = false;
+    const handleLine = (line) => {
+      const t = line.trim();
+      if (!t.startsWith("data:")) return;
+      sawSse = true;
+      const data = t.slice(5).trim();
+      if (!data || data === "[DONE]") return;
+      try {
+        const json = JSON.parse(data);
+        const delta = json?.choices?.[0]?.delta?.content || json?.choices?.[0]?.message?.content || "";
+        if (delta) { full += delta; onToken?.(delta); }
+      } catch {}
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        handleLine(buffer.slice(0, idx));
+        buffer = buffer.slice(idx + 1);
+      }
+    }
+    if (buffer.trim()) handleLine(buffer);
+    if (!sawSse) {
+      // Gateway tidak streaming: buffer berisi JSON utuh
+      try {
+        const json = JSON.parse(buffer || full);
+        const content = json?.choices?.[0]?.message?.content;
+        if (typeof content === "string") { onToken?.(content); return content; }
+      } catch {}
+      if (!full) throw new Error("Respons model tidak memiliki content yang valid.");
+    }
+    return full;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Mengirim chat ke gateway (OpenAI /v1/chat/completions).
  * @param {object} opts {baseUrl, apiKey, model, messages, temperature, max_tokens}
  * @returns {Promise<string>} isi konten jawaban
