@@ -10,10 +10,10 @@
 // ─────────────────────────────────────────────────────────────
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { CONFIG_DIR } from "../constants.mjs";
 
 const MAX_OUTPUT = 20000;
-const SCREENSHOT_DIR = path.join(os.homedir(), ".cutad", "screenshots");
+const SCREENSHOT_DIR = path.join(CONFIG_DIR, "screenshots");
 const NAV_TIMEOUT = 15000;
 
 // Cache browser instance (keep alive between tool calls dalam 1 session)
@@ -22,6 +22,22 @@ let _lastActivity = 0;
 const IDLE_TIMEOUT = 60000; // close browser after 60s idle
 
 const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Hanya http/https yang boleh dibuka browser agent. Skema lain
+// (file:, data:, javascript:, chrome:) bisa membocorkan file lokal
+// atau mengeksekusi di konteks browser -> ditolak tegas.
+export function assertBrowsableUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(String(url || ""));
+  } catch {
+    throw new Error(`URL tidak valid: ${url}`);
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Skema URL ditolak untuk browse agent: ${parsed.protocol} (hanya http/https)`);
+  }
+  return parsed.href;
+}
 
 // Cari executable Chromium sistem (fallback saja)
 function findChromium() {
@@ -144,6 +160,7 @@ function truncate(s, max = MAX_OUTPUT) {
  * Buka URL dan ekstrak konten teks.
  */
 export async function browsePage(url, opts = {}) {
+  const safeUrl = assertBrowsableUrl(url);
   const browser = await getBrowser();
   const page = await browser.newPage();
 
@@ -151,7 +168,7 @@ export async function browsePage(url, opts = {}) {
     await page.setDefaultNavigationTimeout(NAV_TIMEOUT);
     await page.setViewport({ width: opts.width || 1280, height: opts.height || 800 });
 
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+    await page.goto(safeUrl, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
 
     // Tunggu sebentar untuk dynamic content
     if (opts.wait) {
@@ -185,13 +202,14 @@ export async function browsePage(url, opts = {}) {
  * Screenshot halaman.
  */
 export async function screenshotPage(url, opts = {}) {
+  const safeUrl = assertBrowsableUrl(url);
   const browser = await getBrowser();
   const page = await browser.newPage();
 
   try {
     await page.setDefaultNavigationTimeout(NAV_TIMEOUT);
     await page.setViewport({ width: opts.width || 1280, height: opts.height || 800 });
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+    await page.goto(safeUrl, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
 
     if (opts.wait) {
       await sleepMs(Math.min(opts.wait, 5000));
@@ -219,12 +237,13 @@ export async function screenshotPage(url, opts = {}) {
  * Klik elemen di halaman.
  */
 export async function clickElement(url, selector, opts = {}) {
+  const safeUrl = assertBrowsableUrl(url);
   const browser = await getBrowser();
   const page = await browser.newPage();
 
   try {
     await page.setDefaultNavigationTimeout(NAV_TIMEOUT);
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+    await page.goto(safeUrl, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
 
     // Tunggu elemen muncul
     await page.waitForSelector(selector, { timeout: 10000 }).catch(() => {});
@@ -260,12 +279,13 @@ export async function clickElement(url, selector, opts = {}) {
  * Jalankan JavaScript di halaman.
  */
 export async function evalPage(url, jsCode, opts = {}) {
+  const safeUrl = assertBrowsableUrl(url);
   const browser = await getBrowser();
   const page = await browser.newPage();
 
   try {
     await page.setDefaultNavigationTimeout(NAV_TIMEOUT);
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+    await page.goto(safeUrl, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
 
     if (opts.wait) {
       await sleepMs(Math.min(opts.wait, 5000));

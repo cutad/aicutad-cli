@@ -12,7 +12,7 @@ Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatibl
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-orange)]()
 [![Deps](https://img.shields.io/badge/dependencies-4-teal)]()
 
-<img src="docs/tui-demo.jpg" alt="aicutad-cli TUI Demo" width="720">
+<img src="docs/tui-corporate.png" alt="aicutad-cli TUI" width="720">
 
 </div>
 
@@ -194,7 +194,8 @@ aicutad models     # daftar model dari gateway
 aicutad agents     # daftar subagent
 aicutad sessions   # daftar session tersimpan
 aicutad mcp --list # daftar MCP server
-aicutad logout     # hapus kredensial
+aicutad doctor     # diagnostik lingkungan (tambah --offline / --json)
+aicutad logout     # hapus kredensial (di TUI: /logout)
 ```
 
 ## Subagent
@@ -289,6 +290,7 @@ CUTAD_PROFILE=corp aicutad agent "..."
 ```json
 {
   "workspaceOnly": true,
+  "allowRunCommandInWorkspaceOnly": false,
   "allowedTools": ["read_file", "write_file", "edit_file", "list_files", "search_files"],
   "deniedTools": ["run_command"]
 }
@@ -383,8 +385,8 @@ aicutad-cli/
 - [x] Session management (save/load/list)
 - [x] 8 subagent + delegate parallel/chain
 - [x] MCP client support
-- [x] Multi-provider config
-- [x] Plugin system
+- [x] Multi-provider config (modul internal; switching via auth belum diekspos ke CLI)
+- [x] Plugin system (modul internal; belum diekspos ke CLI)
 - [x] First-run wizard
 - [x] CI/CD (GitHub Actions)
 - [x] Login wizard dengan animated spinner & progress bar

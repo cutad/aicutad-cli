@@ -130,7 +130,8 @@ program
   .action((opts) => {
     import("../src/session/index.mjs").then((m) => {
       if (opts.delete) {
-        m.deleteSession(opts.delete);
+        const deleted = m.deleteSession(opts.delete);
+        if (!deleted) { console.error(`  Error: session tidak ditemukan: ${opts.delete}`); process.exitCode = 1; return; }
         console.log(`  Session ${opts.delete} dihapus.`);
         return;
       }
@@ -190,7 +191,7 @@ program
         const { tools } = await m.connectMcpServer(opts.connect);
         console.log(`  Tools di ${opts.connect} (${tools.length}):`);
         tools.forEach((t) => console.log(`   • ${t.name}: ${t.description?.slice(0, 60) || ""}`));
-      } catch (e) { console.error(`  Error: ${e.message}`); }
+      } catch (e) { console.error(`  Error: ${e.message}`); process.exitCode = 1; }
       return;
     }
     const servers = m.listMcpServers();
@@ -211,6 +212,19 @@ program
     if (!entries.length) { console.log("  Audit log kosong."); return; }
     entries.forEach((e) => console.log(`  ${e.ts}  ${String(e.tool).padEnd(14)} ${e.ok ? "ok " : "ERR"}  ${JSON.stringify(e.args)}`));
   }));
+
+// │ doctor — diagnostik lingkungan                                    │
+program
+  .command("doctor")
+  .description("Diagnostik: Node, config, kredensial, gateway, Chromium")
+  .option("-b, --base <url>", "Base URL gateway")
+  .option("--offline", "Lewati pemeriksaan gateway")
+  .option("--json", "Keluarkan JSON (untuk skrip/CI)")
+  .action((opts) => {
+    const argv = buildArgv(opts);
+    if (opts.offline) argv.push("--offline");
+    return import("../src/doctor.mjs").then((m) => m.doctor(argv));
+  });
 
 // │ resume — lanjutkan sesi tersimpan di TUI                         │
 program
@@ -266,14 +280,18 @@ program.action(async () => {
 // Tolak sub-command tidak dikenal secara eksplisit. Tanpa ini,
 // commander meneruskan kata asing ke handler root dan TUI terbuka
 // diam-diam (exit 0) - perilaku yang tidak bisa diterima corporate.
-const KNOWN_COMMANDS = new Set(["login", "status", "logout", "models", "chat", "agents", "agent", "sessions", "mcp", "rollback", "audit", "resume", "help"]);
+const KNOWN_COMMANDS = new Set(["login", "status", "logout", "models", "chat", "agents", "agent", "sessions", "mcp", "rollback", "audit", "doctor", "resume", "help"]);
 const firstArg = process.argv[2];
 if (firstArg && !firstArg.startsWith("-") && !KNOWN_COMMANDS.has(firstArg)) {
   console.error(`  Error: perintah tidak dikenal: ${firstArg}. Jalankan 'aicutad --help'.`);
   process.exit(1);
 }
 
-program.parseAsync(process.argv);
+program.parseAsync(process.argv).catch((e) => {
+  // Kesalahan tak tertangani tampil sebagai pesan bersih, bukan stack trace.
+  console.error(`  Error: ${e?.message || e}`);
+  process.exit(1);
+});
 
 function buildArgv(opts) {
   const args = ["node", "aicutad"];

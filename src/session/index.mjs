@@ -9,6 +9,23 @@ import { atomicWriteFileSync } from "../fs-utils.mjs";
 
 const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
 
+// ID session hanya boleh karakter aman nama file. Tanpa ini, ID seperti
+// "../../auth" bisa keluar dari direktori sessions (path traversal)
+// saat load/delete/export.
+const SESSION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+export function isValidSessionId(id) {
+  return typeof id === "string" && SESSION_ID_RE.test(id) && !id.includes("..");
+}
+
+function sessionFile(id) {
+  if (!isValidSessionId(id)) return null;
+  const file = path.join(SESSIONS_DIR, `${id}.json`);
+  const root = path.resolve(SESSIONS_DIR);
+  const resolved = path.resolve(file);
+  return resolved.startsWith(root + path.sep) ? file : null;
+}
+
 /** Pastikan direktori sessions ada. */
 function ensureDir() {
   fs.mkdirSync(SESSIONS_DIR, { recursive: true });
@@ -46,7 +63,8 @@ export function createSession(model, provider = "cutad") {
 export function saveSession(session) {
   ensureDir();
   session.updatedAt = new Date().toISOString();
-  const file = path.join(SESSIONS_DIR, `${session.id}.json`);
+  const file = sessionFile(session.id) || path.join(SESSIONS_DIR, `${generateId()}.json`);
+  if (!isValidSessionId(session.id)) session.id = path.basename(file, ".json");
   // Backup versi valid sebelumnya, lalu tulis ATOMIK (temp+rename).
   // Proses mati di tengah tidak akan meninggalkan session korup:
   // file lama tetap utuh sampai rename berhasil.
@@ -66,7 +84,8 @@ export function saveSession(session) {
  * @returns {object|null}
  */
 export function loadSession(id) {
-  const file = path.join(SESSIONS_DIR, `${id}.json`);
+  const file = sessionFile(id);
+  if (!file) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch {}
@@ -113,10 +132,13 @@ export function listSessions() {
  * @param {string} id
  */
 export function deleteSession(id) {
-  const file = path.join(SESSIONS_DIR, `${id}.json`);
+  const file = sessionFile(id);
+  if (!file) return false;
   try {
+    const existed = fs.existsSync(file);
     fs.rmSync(file, { force: true });
-    return true;
+    fs.rmSync(`${file}.bak`, { force: true });
+    return existed;
   } catch {
     return false;
   }
@@ -131,7 +153,8 @@ export function deleteSession(id) {
 export function exportSession(id, outPath) {
   const session = loadSession(id);
   if (!session) return false;
-  fs.writeFileSync(outPath, JSON.stringify(session, null, 2));
+  // Session bisa berisi percakapan sensitif: tulis atomik 0600.
+  atomicWriteFileSync(outPath, JSON.stringify(session, null, 2), { mode: 0o600 });
   return true;
 }
 

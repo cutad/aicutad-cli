@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { CONFIG_DIR } from "../constants.mjs";
+import { atomicWriteFileSync } from "../fs-utils.mjs";
 
 const PLUGINS_FILE = path.join(CONFIG_DIR, "plugins.json");
 
@@ -22,7 +23,8 @@ export function readPluginConfig() {
 /** Simpan config plugin. */
 export function writePluginConfig(config) {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(PLUGINS_FILE, JSON.stringify(config, null, 2));
+  atomicWriteFileSync(PLUGINS_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  try { fs.chmodSync(PLUGINS_FILE, 0o600); } catch {}
 }
 
 /**

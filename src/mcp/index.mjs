@@ -6,6 +6,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CONFIG_DIR } from "../constants.mjs";
+import { atomicWriteFileSync } from "../fs-utils.mjs";
+import { VERSION } from "../version.mjs";
 
 const MCP_FILE = path.join(CONFIG_DIR, "mcp.json");
 
@@ -18,10 +20,27 @@ export function readMcpConfig() {
   }
 }
 
-/** Simpan config MCP. */
+/** Simpan config MCP (atomik, 0600; config bisa berisi env rahasia). */
 export function writeMcpConfig(config) {
-  fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(MCP_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  atomicWriteFileSync(MCP_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  try { fs.chmodSync(MCP_FILE, 0o600); } catch {}
+}
+
+// Env induk yang TIDAK diteruskan ke subprocess MCP server: server adalah
+// proses pihak ketiga, tidak perlu kredensial gateway user. Yang mau
+// diteruskan harus ditulis eksplisit di env server pada mcp.json.
+const BLOCKED_ENV_RE = /(api[_-]?key|access[_-]?token|auth[_-]?token|secret|password|passwd|credential)/i;
+
+export function buildMcpEnv(serverEnv = {}, parentEnv = process.env) {
+  const env = {};
+  for (const [key, value] of Object.entries(parentEnv)) {
+    if (BLOCKED_ENV_RE.test(key)) continue;
+    if (/^(CUTAD_API_KEY|GH_TOKEN|GITHUB_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY)$/i.test(key)) continue;
+    env[key] = value;
+  }
+  // env eksplisit per-server selalu menang (termasuk rahasia yang disengaja).
+  return { ...env, ...serverEnv };
 }
 
 /**
@@ -86,12 +105,12 @@ export async function connectMcpServer(name) {
   const transport = new StdioClientTransport({
     command: server.command,
     args: server.args,
-    env: { ...process.env, ...server.env },
+    env: buildMcpEnv(server.env),
   });
 
   const client = new Client({
     name: "aicutad-cli",
-    version: "0.2.0",
+    version: VERSION,
   }, {
     capabilities: {},
   });

@@ -23,6 +23,7 @@ import { listSessions, saveSession, appendMessage } from "../session/index.mjs";
 import { formatTokens } from "../agent/cost.mjs";
 import { estimateMessageTokens } from "../agent/context.mjs";
 import { VERSION } from "../version.mjs";
+import { clearAuth } from "../config.mjs";
 import { getLayout, isColorEnabled, isReducedMotion, truncateText } from "./layout.mjs";
 
 // ── 256-color palette ────────────────────────────────────────
@@ -91,6 +92,7 @@ const COMMANDS = [
   ["/sessions", "Daftar session tersimpan"],
   ["/save", "Simpan session"],
   ["/clear", "Bersihkan layar"],
+  ["/logout", "Hapus kredensial lokal & keluar"],
   ["/exit", "Keluar"],
 ];
 
@@ -947,6 +949,14 @@ export async function startTUI(config) {
       case "/clear":
         messages = [];
         showHelp = false;
+        break;
+      case "/logout":
+        // Sama seperti `aicutad logout`: hapus kredensial lokal, lalu keluar.
+        try { if (config.session) saveSession(config.session); } catch {}
+        clearAuth();
+        cleanup();
+        process.stdout.write("\n  Kredensial lokal telah dihapus (logout). Jalankan 'aicutad login' untuk masuk lagi.\n");
+        process.exit(0);
         break;
       default:
         addMessage({ role: "assistant", content: "Perintah tidak dikenal: " + command + ". Ketik /help" });

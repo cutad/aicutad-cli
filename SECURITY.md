@@ -36,6 +36,14 @@ critical/high: 14 hari kalender sejak laporan terkonfirmasi.
 
 - Batasi tool agent dengan policy (`.aicutad/policy.json` atau
   `~/.cutad/policy.json`): `allowedTools`, `deniedTools`, `workspaceOnly`.
+  `workspaceOnly` memvalidasi realpath (symlink keluar tetap ditolak) dan
+  menolak `run_command` secara default karena shell tidak bisa dikurung ke
+  workspace; izinkan sadar dengan `allowRunCommandInWorkspaceOnly: true`.
+- Tools browser hanya membuka URL http/https (skema `file:` dll ditolak).
+- Audit log meredaksi pola rahasia (Bearer token, API key) sebelum dicatat.
+- Kredensial induk tidak diteruskan ke subprocess MCP server; yang diteruskan
+  hanya env yang ditulis eksplisit di konfigurasi server tersebut.
+- Periksa kesehatan instalasi kapan saja dengan `aicutad doctor`.
 - Gunakan profile terpisah per lingkungan: `CUTAD_PROFILE=corp aicutad`.
 - Command destruktif diblokir secara default; override hanya dengan
   `CUTAD_ALLOW_DESTRUCTIVE=1` secara sadar.

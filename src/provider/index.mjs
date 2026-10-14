@@ -7,6 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { CONFIG_DIR, DEFAULT_BASE_URL, DEFAULT_SITE } from "../constants.mjs";
 import { listModels } from "../api.mjs";
+import { atomicWriteFileSync } from "../fs-utils.mjs";
+import { writeAuth } from "../config.mjs";
 
 const PROVIDERS_FILE = path.join(CONFIG_DIR, "providers.json");
 
@@ -37,7 +39,8 @@ export function readProviders() {
  */
 export function writeProviders(config) {
   ensureDir();
-  fs.writeFileSync(PROVIDERS_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  atomicWriteFileSync(PROVIDERS_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  try { fs.chmodSync(PROVIDERS_FILE, 0o600); } catch {}
 }
 
 /**
@@ -130,8 +133,8 @@ export function syncToAuth() {
     baseUrl: provider.baseUrl,
     site: provider.site || (provider.baseUrl.endsWith("/v1") ? provider.baseUrl.slice(0, -3) : provider.baseUrl),
   };
-  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(path.join(CONFIG_DIR, "auth.json"), JSON.stringify(auth, null, 2), { mode: 0o600 });
+  // Lewat writeAuth resmi: atomik + izin 0600 konsisten dengan login.
+  writeAuth(auth);
 }
 
 export { PROVIDERS_FILE };

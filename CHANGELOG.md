@@ -77,6 +77,18 @@ Rilis stabilisasi & hardening besar-besaran.
 - README & komentar kode dibersihkan dari bahasa marketing ("premium/immersive") menjadi deskripsi faktual.
 - Terverifikasi dengan snapshot PTY pada 100, 48, dan 30 kolom: header tampil, 0 emoji, tidak ada kata "premium".
 
+### Fase 8 — Audit A–Z & hardening lanjutan
+
+- **Path traversal ditutup**: ID session (`load/delete/export`) dan ID checkpoint (`rollback`) divalidasi ketat; pola `../../auth` tidak lagi bisa keluar dari direktori penyimpanan.
+- **Policy `workspaceOnly` diperkuat**: path divalidasi terhadap realpath (symlink ke luar workspace ditolak) dan `run_command` ditolak secara default (shell tidak bisa dikurung); opt-in sadar via `allowRunCommandInWorkspaceOnly`.
+- **Audit log**: pola rahasia (Bearer token, API key, `ghp_*`, dsb) diredaksi sebelum dicatat; izin file dipaksa `0600` juga untuk file lama.
+- **Browser agent**: hanya URL http/https (skema `file:`/`data:` ditolak, mencegah pembacaan file lokal); direktori screenshot mengikuti profile config aktif.
+- **MCP**: kredensial env induk (API key/token/secret) tidak diteruskan ke subprocess server — hanya env eksplisit per-server; versi client mengikuti versi paket; config ditulis atomik `0600`.
+- **Blokir destruktif diperkuat**: `rm -r`, `rm -r -f`, `rm --recursive` kini terdeteksi (sebelumnya hanya bentuk `-rf` gabungan).
+- **CLI**: perintah baru `aicutad doctor` (diagnostik Node/config/kredensial/gateway/policy/Chromium, `--offline`/`--json`, exit 1 bila ada FAIL); `/logout` di TUI; `sessions --delete` & `mcp --connect` kini exit 1 saat target tidak ada; kesalahan tak tertangani tampil bersih tanpa stack trace.
+- **Repo**: file `LICENSE` (MIT) ditambahkan; screenshot README diganti versi corporate; klaim roadmap provider/plugin diluruskan (modul internal, belum diekspos ke CLI); penulisan config provider/plugin atomik.
+- 11 test regresi keamanan baru; total 76 test.
+
 ## 0.4.8
 
 - Rilis sebelumnya (lihat riwayat git).

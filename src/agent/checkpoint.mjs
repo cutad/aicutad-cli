@@ -35,7 +35,14 @@ function saveManifest(cp) {
   );
 }
 
+const CHECKPOINT_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+export function isValidCheckpointId(id) {
+  return typeof id === "string" && CHECKPOINT_ID_RE.test(id) && !id.includes("..");
+}
+
 function loadManifest(id) {
+  if (!isValidCheckpointId(id)) return null;
   try {
     const raw = fs.readFileSync(path.join(CHECKPOINTS_DIR, id, "manifest.json"), "utf8");
     const m = JSON.parse(raw);

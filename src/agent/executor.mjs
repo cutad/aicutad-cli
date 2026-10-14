@@ -15,7 +15,11 @@ const MAX_OUTPUT = 50000; // batas output per tool
 // Command yang dianggap destruktif: diblokir kecuali user secara eksplisit
 // mengizinkan lewat env CUTAD_ALLOW_DESTRUCTIVE=1 atau opsi allowDestructive.
 const DESTRUCTIVE_PATTERNS = [
-  /\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|--recursive.*--force|--force.*--recursive)\b/i,
+  // rm rekursif dalam segala bentuk bendera: -rf, -fr, -r -f, -r saja,
+  // --recursive, dsb. (bentuk terpisah dulu lolos dari pola lama)
+  /\brm\s+(?:-[a-z]*\s+)*--recursive\b/i,
+  /\brm\s+(?:-[a-z]*\s+)*-[a-z]*r[a-z]*(\s|$)/i,
+  /\brm\s+[^|;&]*\s-r\s+[^|;&]*\s-f\b/i,
   /\bmkfs\b/i,
   /\bdd\s+.*\bof=\/dev\//i,
   /\b(shutdown|reboot|poweroff|halt)\b/i,
