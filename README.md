@@ -6,7 +6,7 @@
 
 Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatible `/v1`
 
-[![Version](https://img.shields.io/badge/version-0.5.2-cyan)]()
+[![Version](https://img.shields.io/badge/version-0.5.3-cyan)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.12-green)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-orange)]()
@@ -27,7 +27,7 @@ Kamu kasih tugas, agent bekerja otonom: baca → tulis → verifikasi → lapor.
 ```
 $ aicutad agent "buat file hello.js berisi console.log hello world"
 
-  aicutad-cli agent mode - v0.5.2
+  aicutad-cli agent mode - v0.5.3
   model: deepseek-ai/deepseek-v4-pro  dir: /root/project
 
   > buat file hello.js berisi console.log hello world
@@ -101,7 +101,7 @@ User: "buat file fibonacci.js"
   → Model: lapor hasil ke user
 ```
 
-Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. Maks 20 iterasi untuk safety.
+Model memutuskan sendiri tool apa yang dipakai, berapa kali, dan kapan selesai. Maks 100 iterasi untuk safety (bisa diatur: `aicutad agent --max-iterations <n>` atau env `CUTAD_MAX_ITERATIONS`, rentang 1-1000).
 
 ## TUI Full-Screen
 

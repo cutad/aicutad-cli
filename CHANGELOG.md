@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- Batas iterasi agentic loop naik dari 20 menjadi **100** dan sekarang bisa dikonfigurasi: opsi `maxIterations` / flag `aicutad agent --max-iterations <n>` > env `CUTAD_MAX_ITERATIONS` > default 100. Nilai divalidasi ke rentang 1-1000 (tidak valid -> default). Pesan berhenti dan hasil loop kini memakai batas aktif (`maxIterations` ikut dikembalikan).
+
 ## 0.5.2
 
 - Perbaiki copy-paste di TUI: aktifkan bracketed-paste (mode 2004) dan tangani paste sebagai satu kesatuan. Paste multi-baris tidak lagi terkirim kepotong di baris pertama, paste panjang tidak lagi hilang/redraw per karakter, karakter Tab/ANSI/kontrol di isi paste disanitasi, dan marker paste yang terpotong antar-chunk tetap dikenali. Fallback untuk terminal tanpa bracketed-paste: newline di tengah chunk paste diperlakukan sebagai baris baru, bukan Enter. Input multi-baris ditampilkan dengan penanda ⏎ dan karakter UTF-8 yang terpotong antar-chunk tidak lagi rusak.

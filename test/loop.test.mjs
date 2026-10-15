@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { runAgentLoop } from "../src/agent/loop.mjs";
+import { resolveMaxIterations, DEFAULT_MAX_ITERATIONS } from "../src/constants.mjs";
 
 async function mockServer(handler) {
   const server = http.createServer(handler);
@@ -95,6 +96,41 @@ test("loop: HTTP 500 dari gateway -> return error, bukan throw/crash", async () 
     const result = await runAgentLoop({ baseUrl: url, apiKey: "***", model: "mock", task: "halo", cwd: "/tmp" });
     assert.match(result.result, /Error/);
     assert.ok(result.error);
+  } finally {
+    server.close();
+  }
+});
+
+test("konfigurasi iterasi: default 100, env & opsi, clamp 1-1000", () => {
+  assert.equal(DEFAULT_MAX_ITERATIONS, 100);
+  assert.equal(resolveMaxIterations(undefined, {}), 100);
+  assert.equal(resolveMaxIterations(undefined, { CUTAD_MAX_ITERATIONS: "250" }), 250);
+  assert.equal(resolveMaxIterations(7, { CUTAD_MAX_ITERATIONS: "250" }), 7);
+  assert.equal(resolveMaxIterations("abc", {}), 100);
+  assert.equal(resolveMaxIterations(0, {}), 1);
+  assert.equal(resolveMaxIterations(99999, {}), 1000);
+});
+
+test("loop: batas iterasi dari opsi dihormati (berhenti + pesan batas)", async () => {
+  // Model selalu minta tool, tidak pernah stop -> harus kena batas.
+  const { server, url } = await mockServer((req, res) => {
+    let b = "";
+    req.on("data", (c) => (b += c));
+    req.on("end", () => jsonRes(res, {
+      choices: [{
+        message: {
+          role: "assistant", content: null,
+          tool_calls: [{ id: "c1", type: "function", function: { name: "list_files", arguments: JSON.stringify({ path: "/tmp" }) } }],
+        },
+        finish_reason: "tool_calls",
+      }],
+    }));
+  });
+  try {
+    const result = await runAgentLoop({ baseUrl: url, apiKey: "k", model: "mock", task: "loop terus", cwd: "/tmp", maxIterations: 3, checkpoint: false });
+    assert.equal(result.iterations, 3);
+    assert.equal(result.maxIterations, 3);
+    assert.match(result.result, /Berhenti setelah 3 iterasi/);
   } finally {
     server.close();
   }

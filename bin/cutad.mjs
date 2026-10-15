@@ -30,6 +30,7 @@ Contoh:
 Lingkungan:
   CUTAD_PROFILE=<name>   Profile config terpisah (~/.cutad/profiles/<name>)
   CUTAD_BASE=<url>       Override base URL gateway
+  CUTAD_MAX_ITERATIONS=<n> Batas iterasi agent (default 100, maks 1000)
   NO_COLOR=1             Nonaktifkan warna
 `);
 
@@ -90,6 +91,7 @@ program
   .option("-m, --model <model>", "Model yang dipakai")
   .option("-d, --dir <path>", "Working directory (default: cwd)")
   .option("-y, --yes", "Setujui semua aksi tanpa prompt approval")
+  .option("--max-iterations <n>", "Batas iterasi agent (default 100, env CUTAD_MAX_ITERATIONS)")
   .option("--no-checkpoint", "Nonaktifkan checkpoint/rollback untuk sesi ini")
   .action((task, opts) => {
     const taskText = Array.isArray(task) ? task.join(" ") : task;
@@ -97,6 +99,7 @@ program
       model: opts.model,
       cwd: opts.dir,
       yes: opts.yes,
+      maxIterations: opts.maxIterations,
       checkpoint: opts.checkpoint,
     }));
   });

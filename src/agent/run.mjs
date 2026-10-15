@@ -15,6 +15,7 @@
 import pc from "picocolors";
 import { readAuth, resolveBase } from "../config.mjs";
 import { runAgentLoop } from "./loop.mjs";
+import { resolveMaxIterations } from "../constants.mjs";
 import { VERSION } from "../version.mjs";
 import { createInterface } from "node:readline";
 
@@ -66,7 +67,7 @@ export async function runCliAgent(task, opts = {}) {
   // ── Boot header ────────────────────────────────────────────
   console.log();
   console.log("  " + pc.bold(pc.cyan("aicutad-cli")) + " " + pc.dim(`agent mode \u00B7 v${VERSION}`));
-  console.log("  " + pc.dim("model:") + " " + pc.white(model) + "  " + pc.dim("dir:") + " " + pc.white(cwd));
+  console.log("  " + pc.dim("model:") + " " + pc.white(model) + "  " + pc.dim("dir:") + " " + pc.white(cwd) + "  " + pc.dim("maks iterasi:") + " " + pc.white(String(resolveMaxIterations(opts.maxIterations))));
   console.log("  " + pc.dim("\u2501".repeat(60)));
   console.log();
   console.log("  " + pc.cyan("\u203A") + " " + pc.white(task));
@@ -132,6 +133,7 @@ export async function runCliAgent(task, opts = {}) {
   const result = await runAgentLoop({
     onApprove: askApproval,
     checkpoint: opts.checkpoint !== false,
+    maxIterations: opts.maxIterations,
     baseUrl: BASE_URL,
     apiKey: auth.apiKey,
     model,

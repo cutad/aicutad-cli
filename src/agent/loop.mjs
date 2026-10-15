@@ -7,7 +7,8 @@
 // 3. Model balas: tool_calls lagi? → ulang
 // 4. Model balas: content (finish_reason: stop) → selesai
 //
-// Max 20 iterasi untuk safety.
+// Default maks 100 iterasi untuk safety (bisa diatur:
+// opsi maxIterations > env CUTAD_MAX_ITERATIONS > default 100).
 // ─────────────────────────────────────────────────────────────
 import os from "node:os";
 import { TOOLS } from "./tools.mjs";
@@ -20,8 +21,7 @@ import { buildApprovalPreview } from "./diff.mjs";
 import { createCheckpoint } from "./checkpoint.mjs";
 import { loadPolicy } from "../policy.mjs";
 import { trackEvent } from "../telemetry.mjs";
-
-const MAX_ITERATIONS = 20;
+import { resolveMaxIterations } from "../constants.mjs";
 const AGENT_SYSTEM_PROMPT = `Kamu adalah aicutad-cli, agent coding otonom.
 
 Kamu punya tools untuk membaca, menulis, mengedit file, menjalankan command shell, dan mencari di kode.
@@ -58,6 +58,7 @@ Aturan:
  * @param {function} [opts.onToolResult] - callback saat tool selesai (name, result)
  * @param {function} [opts.onThinking] - callback saat model thinking (content)
  * @param {function} [opts.onError] - callback saat error
+ * @param {number} [opts.maxIterations] - batas iterasi (default: env CUTAD_MAX_ITERATIONS atau 100)
  * @returns {Promise<{result, iterations, toolCalls}>}
  */
 const APPROVAL_TOOLS = new Set(["write_file", "edit_file", "run_command"]);
@@ -65,8 +66,9 @@ const APPROVAL_TOOLS = new Set(["write_file", "edit_file", "run_command"]);
 export async function runAgentLoop({
   baseUrl, apiKey, model, task, cwd,
   onToolCall, onToolResult, onThinking, onError, onCost, onSummarize,
-  onApprove, checkpoint = true,
+  onApprove, checkpoint = true, maxIterations,
 }) {
+  const iterationLimit = resolveMaxIterations(maxIterations);
   const workDir = cwd || process.cwd();
   const messages = [
     { role: "system", content: AGENT_SYSTEM_PROMPT + `\n\nWorking directory: ${workDir}\nOS: ${os.platform()} ${os.release()}\n\nKamu juga punya tools browser: browse_page (buka URL & baca teks), web_search (cari di Google), screenshot (ambil screenshot halaman).` },
@@ -83,7 +85,7 @@ export async function runAgentLoop({
   const costTracker = createCostTracker();
 
   try {
-  while (iterations < MAX_ITERATIONS) {
+  while (iterations < iterationLimit) {
     iterations++;
 
     // Context window management — summarize jika terlalu panjang
@@ -195,16 +197,17 @@ export async function runAgentLoop({
     }
   }
 
-  if (!finishedNormally && iterations >= MAX_ITERATIONS) hitMaxIterations = true;
+  if (!finishedNormally && iterations >= iterationLimit) hitMaxIterations = true;
 
   if (hitMaxIterations) {
-    finalResult += "\n\n(Berhenti setelah 20 iterasi — batas aman.)";
+    finalResult += `\n\n(Berhenti setelah ${iterationLimit} iterasi — batas aman.)`;
   }
 
   trackEvent("agent_loop_complete", { iterations, toolCalls: toolCallCount, totalTokens: costTracker.totalTokens });
   return {
     result: finalResult,
     iterations,
+    maxIterations: iterationLimit,
     toolCalls: toolCallCount,
     cost: costTracker,
     costSummary: formatCostSummary(costTracker),
