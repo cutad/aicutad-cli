@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Perbaiki copy-paste di TUI: aktifkan bracketed-paste (mode 2004) dan tangani paste sebagai satu kesatuan. Paste multi-baris tidak lagi terkirim kepotong di baris pertama, paste panjang tidak lagi hilang/redraw per karakter, karakter Tab/ANSI/kontrol di isi paste disanitasi, dan marker paste yang terpotong antar-chunk tetap dikenali. Fallback untuk terminal tanpa bracketed-paste: newline di tengah chunk paste diperlakukan sebagai baris baru, bukan Enter. Input multi-baris ditampilkan dengan penanda ⏎ dan karakter UTF-8 yang terpotong antar-chunk tidak lagi rusak.
+
 ## 0.5.1
 
 - TUI disamakan dengan mockup `docs/tui-corporate.png`: splash brand + meta persisten di layar non-compact, baris judul + jam di bawah separator, status bar satu warna mengikuti state dengan pemisah `|`, dan footer `TUI corporate: ...` di baris terakhir. Mode compact (< 72 kolom / layar pendek) tetap ringkas tanpa splash.

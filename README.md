@@ -6,7 +6,7 @@
 
 Ditenagai gateway [ai.cutad.web.id](https://ai.cutad.web.id) · OpenAI-compatible `/v1`
 
-[![Version](https://img.shields.io/badge/version-0.5.1-cyan)]()
+[![Version](https://img.shields.io/badge/version-0.5.2-cyan)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.12-green)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-orange)]()
@@ -27,7 +27,7 @@ Kamu kasih tugas, agent bekerja otonom: baca → tulis → verifikasi → lapor.
 ```
 $ aicutad agent "buat file hello.js berisi console.log hello world"
 
-  aicutad-cli agent mode - v0.5.1
+  aicutad-cli agent mode - v0.5.2
   model: deepseek-ai/deepseek-v4-pro  dir: /root/project
 
   > buat file hello.js berisi console.log hello world

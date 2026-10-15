@@ -25,6 +25,8 @@ import { estimateMessageTokens } from "../agent/context.mjs";
 import { VERSION } from "../version.mjs";
 import { clearAuth } from "../config.mjs";
 import { getLayout, isColorEnabled, isReducedMotion, truncateText } from "./layout.mjs";
+import { createPasteParser, sanitizePastedText } from "./paste.mjs";
+import { StringDecoder } from "node:string_decoder";
 
 // ── 256-color palette ────────────────────────────────────────
 const C = {
@@ -55,6 +57,8 @@ const A = {
   showCursor: "\x1b[?25h",
   altEnter: "\x1b[?1049h",
   altExit: "\x1b[?1049l",
+  pasteOn: "\x1b[?2004h",
+  pasteOff: "\x1b[?2004l",
   home: "\x1b[H",
   clearBelow: "\x1b[J",
   clearEOL: "\x1b[K",
@@ -98,12 +102,15 @@ const COMMANDS = [
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const visibleLen = (s) => ("" + s).replace(/\x1b\[[0-9;]*m/g, "").length;
+// Input bisa multi-baris (hasil paste). Untuk tampilan satu baris,
+// newline digambar sebagai ⏎ agar frame tidak rusak.
+const displayInputText = (s) => String(s ?? "").replace(/\n/g, "\u23CE").replace(/\t/g, "  ");
 
 // ── Boot: splash statis singkat (profesional, tanpa animasi berlapis).
 // Dihormati juga CUTAD_NO_ANIMATION / CUTAD_REDUCED_MOTION / TERM=dumb:
 // tampil sebaris lalu langsung masuk aplikasi.
 async function bootSequence(stdout, W, H) {
-  stdout.write(A.altEnter + A.hideCursor + A.home + A.clearBelow);
+  stdout.write(A.altEnter + A.pasteOn + A.hideCursor + A.home + A.clearBelow);
   const title = "aicutad-cli";
   const meta = `v${VERSION} - Node ${process.version.replace("v", "")} - ${process.platform}/${process.arch}`;
   if (isReducedMotion() || W < 44 || H < 10) {
@@ -218,7 +225,8 @@ export async function startTUI(config) {
 
     const prompt = " " + C.bold(C.cyan("you \u203A")) + " ";
     const maxInput = W - prompt.length - 1;
-    const inputDisplay = input.length > maxInput ? input.slice(input.length - maxInput) : input;
+    const disp = displayInputText(input);
+    const inputDisplay = disp.length > maxInput ? disp.slice(disp.length - maxInput) : disp;
 
     // Clear input line, write new content, position cursor
     stdout.write("\x1b[" + inputRow + ";1H\x1b[2K" + prompt + inputDisplay + " ");
@@ -436,7 +444,8 @@ export async function startTUI(config) {
     // ── Input line ──
     const prompt = " " + C.bold(C.cyan("you \u203A")) + " ";
     const maxInput = W - prompt.length - 1;
-    const inputDisplay = input.length > maxInput ? input.slice(input.length - maxInput) : input;
+    const dispInput = displayInputText(input);
+    const inputDisplay = dispInput.length > maxInput ? dispInput.slice(dispInput.length - maxInput) : dispInput;
     lines.push(prompt + inputDisplay + " ");
 
     // ── Footer (persis mockup) ──
@@ -467,7 +476,8 @@ export async function startTUI(config) {
     // Input bukan baris terakhir bila footer tampil (footer = baris terakhir)
     layoutInfo.inputRow = lines.length - (layout.showFooter ? 1 : 0);
     const promptStr = " " + C.bold(C.cyan("you \u203A")) + " ";
-    const inputDisp = input.length > (W - promptStr.length - 1) ? input.slice(input.length - (W - promptStr.length - 1)) : input;
+    const dispForCol = displayInputText(input);
+    const inputDisp = dispForCol.length > (W - promptStr.length - 1) ? dispForCol.slice(dispForCol.length - (W - promptStr.length - 1)) : dispForCol;
     layoutInfo.inputCol = promptStr.length + inputDisp.length + 1;
     // Spinner row = the line where spinner is written (last message area line, 1-indexed)
     layoutInfo.spinnerRow = lines.length - footerH; // same as where spinner is written in lines[]
@@ -973,7 +983,18 @@ export async function startTUI(config) {
   }
 
   // ── Input processing ───────────────────────────────────────
+  // Paste utuh ditambahkan sekali (bukan per karakter): cepat dan
+  // tidak ada redraw O(n^2) untuk paste panjang.
+  function appendPastedText(text) {
+    const clean = sanitizePastedText(text);
+    if (!clean) return;
+    if (modal) return; // modal hanya navigasi panah/Enter/Esc
+    input += clean;
+    updateInputInPlace();
+  }
+
   function processChunk(str) {
+    let inputDirty = false;
     let i = 0;
     while (i < str.length) {
       const ch = str[i];
@@ -1048,6 +1069,20 @@ export async function startTUI(config) {
 
       // Enter
       if (ch === "\r" || ch === "\n") {
+        // Paste tanpa bracketed-paste (terminal lama): newline di
+        // tengah chunk yang masih berisi teks setelahnya adalah
+        // baris baru hasil paste, BUKAN Enter untuk submit.
+        // CRLF dihitung satu newline.
+        if (!modal) {
+          const nlEnd = (ch === "\r" && str[i + 1] === "\n") ? i + 1 : i;
+          const restAfterNl = str.slice(nlEnd + 1);
+          if (/[^\r\n]/.test(restAfterNl)) {
+            input += "\n";
+            inputDirty = true;
+            i = nlEnd + 1;
+            continue;
+          }
+        }
         // Modal Enter — handle per modal type
         if (modal) {
           if (modal.type === "help") {
@@ -1106,7 +1141,7 @@ export async function startTUI(config) {
           // No backspace in model picker
         } else {
           input = input.slice(0, -1);
-          updateInputInPlace();
+          inputDirty = true;
         }
         i += 1;
         continue;
@@ -1121,7 +1156,7 @@ export async function startTUI(config) {
           closeModal();
         } else {
           input += ch;
-          updateInputInPlace();
+          inputDirty = true;
         }
         i += 1;
         continue;
@@ -1130,6 +1165,8 @@ export async function startTUI(config) {
       // Skip other control chars
       i += 1;
     }
+    // Satu kali redraw input per chunk (paste panjang tidak O(n^2))
+    if (inputDirty) updateInputInPlace();
   }
 
   // ── History navigation ─────────────────────────────────────
@@ -1210,6 +1247,7 @@ export async function startTUI(config) {
     stopClock();
     stopTyping();
     stdout.write(A.showCursor);
+    stdout.write(A.pasteOff);
     stdout.write(A.altExit);
     if (stdin.isTTY) stdin.setRawMode(false);
     stdin.pause();
@@ -1224,8 +1262,12 @@ export async function startTUI(config) {
   stdin.resume();
 
   // Input handler (attached early for Ctrl+C during boot)
+  // StringDecoder: karakter UTF-8 multi-byte yang terpotong antar-chunk
+  // tidak rusak. PasteParser: bracketed-paste dikeluarkan utuh.
+  const pasteParser = createPasteParser();
+  const utf8Decoder = new StringDecoder("utf8");
   const onData = (chunk) => {
-    const str = chunk.toString();
+    const str = typeof chunk === "string" ? chunk : utf8Decoder.write(chunk);
     if (booting) {
       // Only handle Ctrl+C during boot
       if (str.includes("\u0003")) {
@@ -1234,7 +1276,10 @@ export async function startTUI(config) {
       }
       return;
     }
-    processChunk(str);
+    for (const ev of pasteParser.push(str)) {
+      if (ev.type === "paste") appendPastedText(ev.text);
+      else if (ev.text) processChunk(ev.text);
+    }
   };
   stdin.on("data", onData);
   stdout.on("resize", render);
