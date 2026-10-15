@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getLayout, isColorEnabled, isReducedMotion, truncateText } from "../src/tui/layout.mjs";
+import { getLayout, isColorEnabled, isReducedMotion, truncateText, buildContextBar } from "../src/tui/layout.mjs";
 
 test("layout: terminal besar bukan compact", () => {
   const l = getLayout(120, 40);
@@ -51,6 +51,18 @@ test("layout: compact tanpa splash persisten", () => {
   assert.equal(l.showSplash, false);
   const pendek = getLayout(120, 12);
   assert.equal(pendek.showSplash, false);
+});
+
+test("context bar: proporsi, clamp, lebar minimum", () => {
+  assert.equal(buildContextBar(0), "░".repeat(10));
+  assert.equal(buildContextBar(100), "█".repeat(10));
+  assert.equal(buildContextBar(50), "█████░░░░░");
+  assert.equal(buildContextBar(42), "████░░░░░░");
+  assert.equal(buildContextBar(150), "█".repeat(10));
+  assert.equal(buildContextBar(-5), "░".repeat(10));
+  assert.equal(buildContextBar(50, 1).length, 3);
+  assert.equal(getLayout(100, 30).showContextBar, true);
+  assert.equal(getLayout(48, 30).showContextBar, false);
 });
 
 test("truncateText", () => {

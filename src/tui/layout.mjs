@@ -53,7 +53,17 @@ export function getLayout(width = 80, height = 24) {
     modelMaxLength: veryNarrow ? 14 : compact ? 24 : 48,
     showHints: !compact,
     showClock: W >= 52,
+    // Bar konteks visual hanya bila lebar cukup agar tidak sesak
+    showContextBar: W >= 56,
   };
+}
+
+/** Bar pemakaian konteks, mis. 42% -> "████░░░░░░". */
+export function buildContextBar(percent, width = 10) {
+  const w = Math.max(3, Math.floor(Number(width) || 10));
+  const p = Math.min(100, Math.max(0, Number(percent) || 0));
+  const filled = Math.round((p / 100) * w);
+  return "█".repeat(filled) + "░".repeat(w - filled);
 }
 
 export function truncateText(text, max) {

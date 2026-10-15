@@ -24,9 +24,11 @@ import { formatTokens } from "../agent/cost.mjs";
 import { estimateMessageTokens } from "../agent/context.mjs";
 import { VERSION } from "../version.mjs";
 import { clearAuth } from "../config.mjs";
-import { getLayout, isColorEnabled, isReducedMotion, truncateText } from "./layout.mjs";
+import { getLayout, isColorEnabled, isReducedMotion, truncateText, buildContextBar } from "./layout.mjs";
 import { createPasteParser, sanitizePastedText } from "./paste.mjs";
 import { StringDecoder } from "node:string_decoder";
+import { execFile } from "node:child_process";
+import { basename } from "node:path";
 
 // ── 256-color palette ────────────────────────────────────────
 const C = {
@@ -192,6 +194,40 @@ export async function startTUI(config) {
   // Track layout positions for in-place updates
   const layoutInfo = { spinnerRow: 0, clockRow: 1, clockCol: 1, inputRow: 0, inputCol: 1, statusRow: 0 };
 
+  // ── Info git untuk status bar (branch + dirty) ──
+  // Di-refresh asinkron & di-throttle, tidak pernah memblok render.
+  let gitBranch = "";
+  let gitDirty = false;
+  let gitCheckAt = 0;
+  let gitChecking = false;
+  let pulseOn = true;
+  function refreshGitInfo() {
+    const nowMs = Date.now();
+    if (gitChecking || nowMs - gitCheckAt < 5000) return;
+    gitChecking = true;
+    gitCheckAt = nowMs;
+    execFile("git", ["-C", process.cwd(), "status", "--porcelain=v1", "--branch"],
+      { timeout: 3000, windowsHide: true }, (err, stdoutText) => {
+        gitChecking = false;
+        if (err || !stdoutText) {
+          if (gitBranch) { gitBranch = ""; gitDirty = false; render(); }
+          return;
+        }
+        const lines = String(stdoutText).split("\n");
+        const head = (lines[0] || "").replace(/^## /, "").trim();
+        let branch = head.split(/\s/)[0].split("...")[0];
+        const noCommit = head.match(/on (\S+)$/);
+        if (noCommit) branch = noCommit[1];
+        if (branch === "HEAD" || branch === "No") branch = "";
+        const dirty = lines.slice(1).some((l) => l.trim().length > 0);
+        if (branch !== gitBranch || dirty !== gitDirty) {
+          gitBranch = branch;
+          gitDirty = dirty;
+          render();
+        }
+      });
+  }
+
   function startSpinnerNoRender() {
     if (spinnerTimer) return;
     spinnerTimer = setInterval(() => {
@@ -273,17 +309,23 @@ export async function startTUI(config) {
   // ── In-place clock update (no full redraw) ─────────────────
   function updateClockInPlace() {
     if (loading || typingActive || modal) return;
-    const { clockRow, clockCol, inputRow, inputCol } = layoutInfo;
+    const { clockRow, clockCol, inputRow, inputCol, statusRow } = layoutInfo;
     if (clockRow < 1) return;
 
     const now = new Date();
     const clock = String(now.getHours()).padStart(2, "0") + ":" +
                   String(now.getMinutes()).padStart(2, "0") + ":" +
                   String(now.getSeconds()).padStart(2, "0");
-    const clockStr = C.dim(clock);
+    const clockStr = C.bold(clock);
 
     // Move to clock position, write clock, restore cursor
     stdout.write("\x1b[" + clockRow + ";" + clockCol + "H" + clockStr);
+
+    // Denyut titik status saat idle (mati bila reduced-motion / bukan ready)
+    if (!isReducedMotion() && status === "ready" && statusRow > 0) {
+      pulseOn = !pulseOn;
+      stdout.write("\x1b[" + statusRow + ";2H" + (pulseOn ? C.bGreen("\u25CF") : C.dim("\u25CB")));
+    }
     // Restore cursor to input position
     stdout.write("\x1b[" + inputRow + ";" + inputCol + "H");
   }
@@ -417,29 +459,55 @@ export async function startTUI(config) {
     // ── Separator ──
     lines.push(C.gray("-".repeat(W)));
 
-    // ── Status bar (mockup: satu baris hijau, segmen dipisah " | ") ──
-    // Warna seluruh baris mengikuti state: ready=hijau, bekerja=kuning,
-    // error=merah. Di mode NO_COLOR semua fungsi warna jadi identitas.
+    // ── Status bar ──
+    // Hierarki warna per segmen (bukan satu warna rata): state berwarna
+    // sesuai kondisi, model tegas, info sekunder redup, bar konteks
+    // berubah hijau->kuning->merah. Pemisah " | " abu-abu.
     const sLabelPlain = loading ? "bekerja" : status === "error" ? "error" : (scrollOffset > 0 ? "scroll " + scrollOffset : "ready");
-    const statusColor = loading ? C.bYellow : status === "error" ? C.bRed : C.bGreen;
+    const stateColor = loading ? C.bYellow : status === "error" ? C.bRed : C.bGreen;
     const msgCount = messages.length + " pesan";
     const provider = config.provider || "cutad";
     const modelDisplay = truncateText(model, layout.modelMaxLength);
+    const sep = " " + C.gray("|") + " ";
 
-    const segments = ["\u25CF " + sLabelPlain, modelDisplay, msgCount];
+    let statusLine = " " + stateColor("\u25CF " + sLabelPlain) + sep + C.bold(modelDisplay) + sep + C.dim(msgCount);
     if (costInfo && !layout.veryNarrow) {
-      segments.push(formatTokens(costInfo.totalTokens) + " tok", costInfo.costFormatted);
+      statusLine += sep + C.dim(formatTokens(costInfo.totalTokens) + " tok") + sep + C.dim(costInfo.costFormatted);
     }
-    segments.push("ctx " + ctxPercent + "%");
-    if (!layout.compact) segments.push(provider);
+    const ctxColor = ctxPercent >= 80 ? C.bRed : ctxPercent >= 60 ? C.bYellow : C.bGreen;
+    if (layout.showContextBar) {
+      statusLine += sep + C.dim("ctx") + " " + ctxColor(buildContextBar(ctxPercent)) + " " + ctxColor(ctxPercent + "%");
+    } else {
+      statusLine += sep + C.dim("ctx " + ctxPercent + "%");
+    }
+    if (!layout.compact && W >= 120) statusLine += sep + C.dim(provider);
+    if (!layout.compact) {
+      refreshGitInfo();
+      // Segmen folder+branch menyesuaikan sisa lebar, bukan memotong paksa
+      const allowance = W - visibleLen(statusLine) - 3;
+      if (allowance >= 10) {
+        const folder = basename(process.cwd()) || "";
+        let gitPart = folder;
+        if (gitBranch) gitPart += " \u00B7 " + gitBranch + (gitDirty ? "*" : "");
+        gitPart = truncateText(gitPart, allowance);
+        statusLine += sep + (gitBranch ? C.teal(gitPart) : C.dim(gitPart));
+      }
+    }
 
-    let statusPlain = " " + segments.join("  |  ");
+    // Hint kanan hanya bila benar-benar muat, jangan mendorong segmen lain
     if (layout.showHints) {
       const hint = "/help untuk bantuan";
-      const hintPad = Math.max(1, W - statusPlain.length - hint.length - 1);
-      statusPlain += " ".repeat(hintPad) + hint;
+      if (visibleLen(statusLine) + hint.length + 2 <= W) {
+        const hintPad = W - visibleLen(statusLine) - hint.length - 1;
+        statusLine += " ".repeat(hintPad) + C.dim(hint);
+      }
     }
-    lines.push(statusColor(truncateText(statusPlain, W)));
+    // Potong berdasarkan panjang terlihat agar ANSI tidak ikut terhitung
+    if (visibleLen(statusLine) > W) {
+      const plain = statusLine.replace(/\x1b\[[0-9;]*m/g, "");
+      statusLine = plain.slice(0, W - 1) + "\u2026";
+    }
+    lines.push(statusLine);
 
     // ── Input line ──
     const prompt = " " + C.bold(C.cyan("you \u203A")) + " ";
@@ -448,9 +516,18 @@ export async function startTUI(config) {
     const inputDisplay = dispInput.length > maxInput ? dispInput.slice(dispInput.length - maxInput) : dispInput;
     lines.push(prompt + inputDisplay + " ");
 
-    // ── Footer (persis mockup) ──
+    // ── Deck hint (baris terakhir): tombol-tombol penting ──
+    // Key dicetak cyan tegas, keterangannya redup. Compact dipangkas.
     if (layout.showFooter) {
-      lines.push(" " + C.dim(truncateText("TUI corporate: label teks, tanpa emoji, splash statis, mode compact < 72 kolom", W - 1)));
+      const key = (k) => C.bold(C.cyan(k));
+      const deck = layout.compact
+        ? " \u25B8 " + key("/help") + C.dim(" bantuan") + C.dim("  \u00B7  ") + key("Ctrl+C") + C.dim(" keluar")
+        : " \u25B8 " + key("Tab") + C.dim(" lengkapi") + C.dim("  \u00B7  ")
+          + key("\u2191\u2193") + C.dim(" riwayat") + C.dim("  \u00B7  ")
+          + key("Ctrl+L") + C.dim(" bersih") + C.dim("  \u00B7  ")
+          + key("Ctrl+S") + C.dim(" simpan") + C.dim("  \u00B7  ")
+          + key("Ctrl+C") + C.dim(" keluar");
+      lines.push(visibleLen(deck) > W ? truncateText(deck.replace(/\x1b\[[0-9;]*m/g, ""), W) : deck);
     }
 
     // ── Build single-write frame with ABSOLUTE positioning ──

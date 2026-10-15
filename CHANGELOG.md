@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.4
+
+- Redesign area bawah TUI: teks footer `TUI corporate: ...` dihapus, diganti deck hint tombol (`Tab` lengkapi, `↑↓` riwayat, `Ctrl+L` bersih, `Ctrl+S` simpan, `Ctrl+C` keluar; versi ringkas di mode compact).
+- Status bar lebih informatif & hidup: hierarki warna per segmen, bar pemakaian konteks visual (hijau/kuning/merah mengikuti level), segmen folder kerja + branch git (tanda `*` bila dirty, refresh asinkron tanpa memblok render), dan titik status berdenyut saat idle (nonaktif bila reduced-motion). Segmen menyesuaikan lebar terminal agar tidak terpotong.
+
 ## 0.5.3
 
 - Batas iterasi agentic loop naik dari 20 menjadi **100** dan sekarang bisa dikonfigurasi: opsi `maxIterations` / flag `aicutad agent --max-iterations <n>` > env `CUTAD_MAX_ITERATIONS` > default 100. Nilai divalidasi ke rentang 1-1000 (tidak valid -> default). Pesan berhenti dan hasil loop kini memakai batas aktif (`maxIterations` ikut dikembalikan).
