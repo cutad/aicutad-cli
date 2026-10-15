@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "commander": "^12.1.0",
+    "commander": "^15.0.0",
     "picocolors": "^1.1.1",
     "puppeteer": "^25.13.0",
     "undici": "^7.30.0"
