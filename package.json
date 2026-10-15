@@ -1,7 +1,7 @@
 {
   "name": "aicutad-cli",
-  "version": "0.5.0",
-  "description": "AI coding agent CLI \u2014 baca, tulis, edit file & jalankan command otonom. Ditenagai gateway ai.cutad.web.id (OpenAI-compatible /v1).",
+  "version": "0.5.1",
+  "description": "AI coding agent CLI — baca, tulis, edit file & jalankan command otonom. Ditenagai gateway ai.cutad.web.id (OpenAI-compatible /v1).",
   "type": "module",
   "bin": {
     "aicutad": "bin/cutad.mjs"

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- TUI disamakan dengan mockup `docs/tui-corporate.png`: splash brand + meta persisten di layar non-compact, baris judul + jam di bawah separator, status bar satu warna mengikuti state dengan pemisah `|`, dan footer `TUI corporate: ...` di baris terakhir. Mode compact (< 72 kolom / layar pendek) tetap ringkas tanpa splash.
+- Posisi jam, status, input, dan kursor disesuaikan dengan layout baru; test layout bertambah untuk `showSplash` / `showFooter` / `headerLines`.
+
 ## 0.5.0
 
 Rilis stabilisasi & hardening besar-besaran.

@@ -38,6 +38,21 @@ test("reduced motion dari env", () => {
   assert.equal(isReducedMotion({}), false);
 });
 
+test("layout: layar besar tampilkan splash persisten & footer (mockup)", () => {
+  const l = getLayout(120, 40);
+  assert.equal(l.showSplash, true);
+  assert.equal(l.showFooter, true);
+  assert.equal(l.headerLines, 5);
+});
+
+test("layout: compact tanpa splash persisten", () => {
+  const l = getLayout(48, 24);
+  assert.equal(l.compact, true);
+  assert.equal(l.showSplash, false);
+  const pendek = getLayout(120, 12);
+  assert.equal(pendek.showSplash, false);
+});
+
 test("truncateText", () => {
   assert.equal(truncateText("abcdef", 4), "abc…");
   assert.equal(truncateText("abc", 4), "abc");

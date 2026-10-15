@@ -31,6 +31,10 @@ export function getLayout(width = 80, height = 24) {
   const H = Math.max(8, Number(height) || 24);
   const compact = W < 72 || H < 16;
   const veryNarrow = W < 44;
+  // Splash persisten (brand + meta) hanya di layar cukup besar, samakan
+  // dengan mockup docs/tui-corporate.png; layar kecil tetap ringkas.
+  const showSplash = !compact && H >= 18;
+  const showFooter = W >= 44;
   return {
     width: W,
     height: H,
@@ -40,8 +44,11 @@ export function getLayout(width = 80, height = 24) {
     contentWidth: Math.max(16, W - 2),
     // Modal: maksimal 76 kolom, tapi selalu muat di layar
     modalWidth: Math.max(20, Math.min(76, W - 4)),
-    // Di compact, header dipangkas jadi satu baris esensial
-    headerLines: compact ? 1 : 2,
+    // Di compact, header dipangkas jadi satu baris esensial.
+    // Non-compact: splash 2 baris + separator + baris judul + separator = 5.
+    headerLines: showSplash ? 5 : 2,
+    showSplash,
+    showFooter,
     // Batas panjang label model agar tidak mendorong jam/status keluar
     modelMaxLength: veryNarrow ? 14 : compact ? 24 : 48,
     showHints: !compact,

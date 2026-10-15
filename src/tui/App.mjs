@@ -338,23 +338,35 @@ export async function startTUI(config) {
 
     const lines = [];
 
-    // ── Header ──
+    // ── Header (samakan mockup docs/tui-corporate.png) ──
+    // Non-compact: splash persisten 2 baris (brand + meta), separator,
+    // baris judul + jam, separator. Compact: cukup baris judul + separator.
     const now = new Date();
     const clock = String(now.getHours()).padStart(2, "0") + ":" +
                   String(now.getMinutes()).padStart(2, "0") + ":" +
                   String(now.getSeconds()).padStart(2, "0");
+    let titleRow = 1;
+    if (layout.showSplash) {
+      lines.push(" " + C.bold(C.cyan("aicutad-cli")));
+      const meta = "AI Coding Agent CLI" + "  \u00B7  " + `v${VERSION}` + "  \u00B7  " +
+        "Node " + process.version.replace("v", "") + "  \u00B7  " + process.platform + "/" + process.arch;
+      lines.push(" " + C.dim(truncateText(meta, W - 1)));
+      lines.push(C.gray("-".repeat(W)));
+      titleRow = 4;
+    }
     const headerLeft = layout.compact
       ? " " + C.bold(C.cyan("aicutad-cli")) + " " + C.gray(`v${VERSION}`)
-      : " " + C.bold(C.cyan("aicutad-cli")) +
-        " " + C.gray("\u2502") + " " + C.dim("AI Coding Agent CLI") + " " + C.gray(`v${VERSION}`);
-    const headerRight = layout.showClock ? C.dim(clock) : "";
+      : " " + C.bold("aicutad-cli") +
+        "  " + C.gray("|") + "  " + C.bold("AI Coding Agent CLI") + " " + C.bold(`v${VERSION}`);
+    const headerRight = layout.showClock ? C.bold(clock) : "";
     const headerPad = Math.max(1, W - visibleLen(headerLeft) - visibleLen(headerRight) - 1);
     lines.push(headerLeft + (headerRight ? " ".repeat(headerPad) + headerRight : ""));
     lines.push(C.gray("-".repeat(W)));
+    const headerH = lines.length;
 
     // ── Messages area ──
-    const footerH = 3; // separator + status + input
-    const msgAreaH = H - 2 - footerH;
+    const footerH = layout.showFooter ? 4 : 3; // separator + status + input (+ footer)
+    const msgAreaH = Math.max(1, H - headerH - footerH);
     const msgLines = buildMessageLines(W);
 
     // Scroll: show last msgAreaH lines, adjusted by scrollOffset
@@ -397,43 +409,40 @@ export async function startTUI(config) {
     // ── Separator ──
     lines.push(C.gray("-".repeat(W)));
 
-    // ── Status bar ──
-    const sIcon = loading ? C.bYellow("\u25CF") : status === "error" ? C.bRed("\u25CF") : C.bGreen("\u25CF");
-    const sLabel = loading ? C.bYellow("bekerja") : status === "error" ? C.bRed("error") : (scrollOffset > 0 ? C.bBlue("scroll " + scrollOffset) : C.bGreen("ready"));
+    // ── Status bar (mockup: satu baris hijau, segmen dipisah " | ") ──
+    // Warna seluruh baris mengikuti state: ready=hijau, bekerja=kuning,
+    // error=merah. Di mode NO_COLOR semua fungsi warna jadi identitas.
+    const sLabelPlain = loading ? "bekerja" : status === "error" ? "error" : (scrollOffset > 0 ? "scroll " + scrollOffset : "ready");
+    const statusColor = loading ? C.bYellow : status === "error" ? C.bRed : C.bGreen;
     const msgCount = messages.length + " pesan";
     const provider = config.provider || "cutad";
     const modelDisplay = truncateText(model, layout.modelMaxLength);
 
-    // Build status segments
-    let statusLine = " " + sIcon + " " + C.gray("\u2502") + " " + sLabel + " " + C.gray("\u2502") +
-                     " " + C.bold(modelDisplay) + " " + C.gray("\u2502") + " " + C.dim(msgCount);
-
-    // Cost segment — tampilkan tokens + biaya (selalu jika ada costInfo)
+    const segments = ["\u25CF " + sLabelPlain, modelDisplay, msgCount];
     if (costInfo && !layout.veryNarrow) {
-      const costStr = C.dim(formatTokens(costInfo.totalTokens) + " tok") + " " + C.gray("\u2502") + " " + C.dim(costInfo.costFormatted);
-      statusLine += " " + C.gray("\u2502") + " " + costStr;
+      segments.push(formatTokens(costInfo.totalTokens) + " tok", costInfo.costFormatted);
     }
+    segments.push("ctx " + ctxPercent + "%");
+    if (!layout.compact) segments.push(provider);
 
-    // Context window segment — selalu tampilkan (ctx 0% saat awal)
-    {
-      const ctxColor = ctxPercent > 80 ? C.bRed : ctxPercent > 60 ? C.bYellow : C.dim;
-      statusLine += " " + C.gray("\u2502") + " " + ctxColor("ctx " + ctxPercent + "%");
-    }
-
-    if (!layout.compact) statusLine += " " + C.gray("\u2502") + " " + C.dim(provider);
+    let statusPlain = " " + segments.join("  |  ");
     if (layout.showHints) {
-      const hint = C.dim("/help untuk bantuan");
-      const hintPad = Math.max(1, W - visibleLen(statusLine) - visibleLen(hint) - 1);
-      lines.push(statusLine + " ".repeat(hintPad) + hint);
-    } else {
-      lines.push(truncateText(statusLine, W));
+      const hint = "/help untuk bantuan";
+      const hintPad = Math.max(1, W - statusPlain.length - hint.length - 1);
+      statusPlain += " ".repeat(hintPad) + hint;
     }
+    lines.push(statusColor(truncateText(statusPlain, W)));
 
     // ── Input line ──
     const prompt = " " + C.bold(C.cyan("you \u203A")) + " ";
     const maxInput = W - prompt.length - 1;
     const inputDisplay = input.length > maxInput ? input.slice(input.length - maxInput) : input;
     lines.push(prompt + inputDisplay + " ");
+
+    // ── Footer (persis mockup) ──
+    if (layout.showFooter) {
+      lines.push(" " + C.dim(truncateText("TUI corporate: label teks, tanpa emoji, splash statis, mode compact < 72 kolom", W - 1)));
+    }
 
     // ── Build single-write frame with ABSOLUTE positioning ──
     // NO \n — \n after last line causes terminal scroll = glitch/double.
@@ -451,27 +460,27 @@ export async function startTUI(config) {
     prevLineCount = lines.length;
 
     // ── Save layout positions for in-place timer updates ──
-    // Clock is on row 1 (header), at the right side
-    layoutInfo.clockRow = 1;
+    // Clock ada di baris judul (baris 4 bila splash tampil, else baris 1)
+    layoutInfo.clockRow = titleRow;
     const clockStr = "00:00:00";
     layoutInfo.clockCol = W - clockStr.length;
-    // Input is the last line
-    layoutInfo.inputRow = lines.length;
+    // Input bukan baris terakhir bila footer tampil (footer = baris terakhir)
+    layoutInfo.inputRow = lines.length - (layout.showFooter ? 1 : 0);
     const promptStr = " " + C.bold(C.cyan("you \u203A")) + " ";
     const inputDisp = input.length > (W - promptStr.length - 1) ? input.slice(input.length - (W - promptStr.length - 1)) : input;
     layoutInfo.inputCol = promptStr.length + inputDisp.length + 1;
     // Spinner row = the line where spinner is written (last message area line, 1-indexed)
     layoutInfo.spinnerRow = lines.length - footerH; // same as where spinner is written in lines[]
-    // Status row = second to last line
-    layoutInfo.statusRow = lines.length - 1;
+    // Status row = 2 baris di atas footer, atau kedua terakhir tanpa footer
+    layoutInfo.statusRow = lines.length - (layout.showFooter ? 2 : 1);
 
     // ── Modal overlay ──
     if (modal) {
       frame += buildModalOverlay(modal, W, H);
     }
 
-    // Position cursor at end of input
-    const cursorRow = lines.length;
+    // Position cursor at end of input (bukan di footer)
+    const cursorRow = layoutInfo.inputRow;
     const cursorCol = prompt.length + inputDisplay.length + 1;
     frame += A.move(cursorRow, cursorCol);
 
